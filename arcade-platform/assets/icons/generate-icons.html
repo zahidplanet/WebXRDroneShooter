@@ -1,0 +1,84 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>AR-Cade Icon Generator</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            padding: 20px;
+        }
+        .icons-container {
+            display: flex;
+            flex-wrap: wrap;
+            justify-content: center;
+            margin-top: 20px;
+        }
+        .icon {
+            margin: 10px;
+            text-align: center;
+        }
+        canvas {
+            border: 1px solid #ccc;
+        }
+    </style>
+</head>
+<body>
+    <h1>AR-Cade Icon Generator</h1>
+    <p>Click "Generate Icons" to create basic placeholder icons for the PWA</p>
+    <button id="generate">Generate Icons</button>
+    <div class="icons-container" id="iconsContainer"></div>
+
+    <script>
+        const sizes = [72, 96, 128, 144, 152, 192, 384, 512];
+        const iconContainer = document.getElementById('iconsContainer');
+        
+        document.getElementById('generate').addEventListener('click', () => {
+            iconContainer.innerHTML = '';
+            
+            sizes.forEach(size => {
+                // Create icon container
+                const iconDiv = document.createElement('div');
+                iconDiv.className = 'icon';
+                
+                // Create canvas for the icon
+                const canvas = document.createElement('canvas');
+                canvas.width = size;
+                canvas.height = size;
+                const ctx = canvas.getContext('2d');
+                
+                // Create gradient background
+                const gradient = ctx.createLinearGradient(0, 0, size, size);
+                gradient.addColorStop(0, '#667eea');
+                gradient.addColorStop(1, '#764ba2');
+                
+                // Draw the background
+                ctx.fillStyle = gradient;
+                ctx.fillRect(0, 0, size, size);
+                
+                // Draw the text
+                ctx.fillStyle = 'white';
+                ctx.font = `bold ${size/4}px Arial`;
+                ctx.textAlign = 'center';
+                ctx.textBaseline = 'middle';
+                ctx.fillText('AR', size/2, size/2 - size/8);
+                ctx.fillText('Cade', size/2, size/2 + size/8);
+                
+                // Add canvas to the container
+                iconDiv.appendChild(canvas);
+                
+                // Add download link
+                const link = document.createElement('a');
+                link.href = canvas.toDataURL('image/png');
+                link.download = `icon-${size}x${size}.png`;
+                link.textContent = `Download ${size}x${size}`;
+                iconDiv.appendChild(link);
+                
+                iconContainer.appendChild(iconDiv);
+            });
+        });
+    </script>
+</body>
+</html> 

@@ -2,7 +2,26 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="apple-mobile-web-app-title" content="AR-Cade">
+    
+    <!-- App icons for iOS -->
+    <link rel="apple-touch-icon" href="assets/icons/icon-152x152.png">
+    <link rel="apple-touch-icon" sizes="152x152" href="assets/icons/icon-152x152.png">
+    <link rel="apple-touch-icon" sizes="180x180" href="assets/icons/icon-192x192.png">
+    <link rel="apple-touch-icon" sizes="167x167" href="assets/icons/icon-152x152.png">
+    
+    <!-- Splash screens for iOS -->
+    <link rel="apple-touch-startup-image" href="assets/icons/icon-512x512.png">
+    
+    <!-- Web app manifest for PWA -->
+    <link rel="manifest" href="manifest.json">
+    
+    <!-- Theme color for browser UI -->
+    <meta name="theme-color" content="#667eea">
+    
     <title>AR-Cade Platform</title>
     <style>
         body {
@@ -47,6 +66,33 @@
             background-color: #45a049;
             transform: scale(1.05);
         }
+        #install-banner {
+            position: fixed;
+            bottom: 0;
+            left: 0;
+            right: 0;
+            background-color: rgba(0,0,0,0.8);
+            color: white;
+            padding: 15px;
+            display: none;
+            justify-content: space-between;
+            align-items: center;
+        }
+        #install-button {
+            background-color: #4CAF50;
+            border: none;
+            color: white;
+            padding: 8px 16px;
+            border-radius: 4px;
+            cursor: pointer;
+        }
+        #install-close {
+            background: none;
+            border: none;
+            color: white;
+            font-size: 20px;
+            cursor: pointer;
+        }
     </style>
 </head>
 <body>
@@ -55,6 +101,16 @@
         <p>Experience the next generation of augmented reality gaming with our dynamic AR-Cade platform.</p>
         <a href="lobby/index.html" class="enter-button">Enter AR-Cade</a>
     </div>
+    
+    <!-- Install banner for PWA -->
+    <div id="install-banner">
+        <span>Install AR-Cade on your home screen for the best experience</span>
+        <div>
+            <button id="install-button">Install</button>
+            <button id="install-close">×</button>
+        </div>
+    </div>
+    
     <script>
         // Check if WebXR is supported
         if (navigator.xr) {
@@ -66,6 +122,57 @@
                 });
         } else {
             alert('WebXR is not supported on this device or browser. Please use a WebXR-compatible browser.');
+        }
+        
+        // Service Worker Registration
+        if ('serviceWorker' in navigator) {
+            window.addEventListener('load', () => {
+                navigator.serviceWorker.register('./service-worker.js')
+                    .then(registration => {
+                        console.log('ServiceWorker registration successful with scope: ', registration.scope);
+                    })
+                    .catch(error => {
+                        console.log('ServiceWorker registration failed: ', error);
+                    });
+            });
+        }
+        
+        // PWA Installation
+        let deferredPrompt;
+        const installBanner = document.getElementById('install-banner');
+        const installButton = document.getElementById('install-button');
+        const installClose = document.getElementById('install-close');
+        
+        // Show the install banner if PWA can be installed
+        window.addEventListener('beforeinstallprompt', (e) => {
+            e.preventDefault();
+            deferredPrompt = e;
+            installBanner.style.display = 'flex';
+        });
+        
+        // Handle the install button click
+        installButton.addEventListener('click', async () => {
+            if (!deferredPrompt) return;
+            deferredPrompt.prompt();
+            const { outcome } = await deferredPrompt.userChoice;
+            console.log(`User response to the install prompt: ${outcome}`);
+            deferredPrompt = null;
+            installBanner.style.display = 'none';
+        });
+        
+        // Close the install banner
+        installClose.addEventListener('click', () => {
+            installBanner.style.display = 'none';
+        });
+        
+        // iOS-specific detection for add to home screen
+        const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent) && !window.MSStream;
+        const isStandalone = window.matchMedia('(display-mode: standalone)').matches;
+        
+        // Show iOS-specific instructions for adding to home screen
+        if (isIOS && !isStandalone && !sessionStorage.getItem('iosPromptShown')) {
+            alert('To install this app on your iOS device: tap the share icon, then "Add to Home Screen"');
+            sessionStorage.setItem('iosPromptShown', 'true');
         }
     </script>
 </body>
