@@ -67,6 +67,37 @@ The lobby automatically:
 3. Open the index.html file in a WebXR-compatible browser
 4. Allow camera permissions when prompted
 
+### Running the Project for Mobile Testing
+
+We've created a simple server script that makes it easy to test the AR-Cade on mobile devices:
+
+```bash
+# Install dependencies
+npm install qrcode-terminal
+
+# Run the server
+node easy-server.js
+```
+
+The server will:
+1. Automatically find an available port (starting with 8443)
+2. Generate a QR code you can scan with your mobile device
+3. Provide clear access instructions
+
+When accessing from your mobile device:
+1. Scan the QR code displayed in the terminal
+2. Accept the security certificate warning (this is expected for local development)
+3. Allow camera permissions when prompted
+4. Add to your home screen for a full-screen app experience
+
+### Troubleshooting
+
+If you encounter issues:
+- Make sure both your computer and mobile device are on the same WiFi network
+- Ensure your mobile browser supports WebXR (Safari on iOS 13+, Chrome on Android)
+- Try clearing your browser cache or using private browsing mode
+- Check that camera permissions are enabled for the website
+
 ## Contributing
 See [CONTRIBUTING.md](CONTRIBUTING.md) for details on how to contribute to this project.
 
