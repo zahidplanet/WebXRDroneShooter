@@ -1,0 +1,156 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AR-Cade Lobby</title>
+    <script src="https://aframe.io/releases/1.4.0/aframe.min.js"></script>
+    <script src="https://unpkg.com/aframe-event-set-component@5.0.0/dist/aframe-event-set-component.min.js"></script>
+    <script src="https://raw.githack.com/AR-js-org/AR.js/master/aframe/build/aframe-ar.js"></script>
+    <script src="lobby.js"></script>
+    <script>
+        // Component for individual game panels
+        AFRAME.registerComponent('game-panel', {
+            schema: {
+                id: {type: 'string'},
+                title: {type: 'string'},
+                description: {type: 'string'},
+                path: {type: 'string'},
+                featured: {type: 'boolean', default: false}
+            },
+            init: function () {
+                const data = this.data;
+                const el = this.el;
+                
+                // Create panel background
+                const panel = document.createElement('a-plane');
+                panel.setAttribute('width', '1.5');
+                panel.setAttribute('height', '2');
+                panel.setAttribute('color', data.featured ? '#2980b9' : '#34495e');
+                panel.setAttribute('shader', 'flat');
+                
+                // Create title text
+                const title = document.createElement('a-text');
+                title.setAttribute('value', data.title);
+                title.setAttribute('align', 'center');
+                title.setAttribute('position', '0 0.7 0.01');
+                title.setAttribute('width', '1.4');
+                title.setAttribute('wrap-count', '15');
+                title.setAttribute('color', 'white');
+                
+                // Create description text
+                const description = document.createElement('a-text');
+                description.setAttribute('value', data.description);
+                description.setAttribute('align', 'center');
+                description.setAttribute('position', '0 0.3 0.01');
+                description.setAttribute('width', '1.3');
+                description.setAttribute('wrap-count', '25');
+                description.setAttribute('color', '#cccccc');
+                description.setAttribute('font-size', '0.04');
+                
+                // Create play button
+                const button = document.createElement('a-plane');
+                button.setAttribute('position', '0 -0.5 0.02');
+                button.setAttribute('width', '0.8');
+                button.setAttribute('height', '0.2');
+                button.setAttribute('color', '#4CAF50');
+                button.setAttribute('class', 'clickable');
+                button.setAttribute('event-set__mouseenter', 'scale: 1.05 1.05 1.05; color: #45a049');
+                button.setAttribute('event-set__mouseleave', 'scale: 1 1 1; color: #4CAF50');
+                
+                // Add interaction
+                button.addEventListener('click', () => {
+                    if (data.path && data.path !== '#') {
+                        window.location.href = '../games/' + data.path;
+                    } else {
+                        alert('This game is coming soon!');
+                    }
+                });
+                
+                // Create button text
+                const buttonText = document.createElement('a-text');
+                buttonText.setAttribute('value', 'PLAY');
+                buttonText.setAttribute('align', 'center');
+                buttonText.setAttribute('position', '0 0 0.01');
+                buttonText.setAttribute('color', 'white');
+                buttonText.setAttribute('width', '0.7');
+                
+                // If featured, add a badge
+                if (data.featured) {
+                    const featuredBadge = document.createElement('a-entity');
+                    featuredBadge.setAttribute('position', '0.6 0.9 0.02');
+                    featuredBadge.setAttribute('geometry', 'primitive: circle; radius: 0.1');
+                    featuredBadge.setAttribute('material', 'color: #f39c12; shader: flat');
+                    
+                    const starIcon = document.createElement('a-text');
+                    starIcon.setAttribute('value', '★');
+                    starIcon.setAttribute('align', 'center');
+                    starIcon.setAttribute('position', '0 0 0.01');
+                    starIcon.setAttribute('color', 'white');
+                    starIcon.setAttribute('scale', '0.5 0.5 0.5');
+                    
+                    featuredBadge.appendChild(starIcon);
+                    panel.appendChild(featuredBadge);
+                }
+                
+                // Assemble panel
+                button.appendChild(buttonText);
+                panel.appendChild(title);
+                panel.appendChild(description);
+                panel.appendChild(button);
+                el.appendChild(panel);
+            }
+        });
+
+        // Make camera cursor work for interaction
+        AFRAME.registerComponent('cursor-listener', {
+            init: function () {
+                this.el.addEventListener('click', function (evt) {
+                    console.log('I was clicked!');
+                });
+            }
+        });
+    </script>
+</head>
+<body>
+    <a-scene 
+        embedded 
+        arjs="sourceType: webcam; debugUIEnabled: false;"
+        renderer="antialias: true">
+        
+        <!-- Camera with cursor for interaction -->
+        <a-entity camera look-controls>
+            <a-entity 
+                cursor="fuse: true; fuseTimeout: 500"
+                position="0 0 -1"
+                geometry="primitive: ring; radiusInner: 0.02; radiusOuter: 0.03"
+                material="color: white; shader: flat"
+                raycaster="objects: .clickable">
+            </a-entity>
+        </a-entity>
+        
+        <!-- AR Lobby Title -->
+        <a-entity 
+            text="value: AR-Cade Lobby; align: center; width: 4" 
+            position="0 2.5 -2" 
+            rotation="0 0 0">
+        </a-entity>
+        
+        <!-- Container for game panels -->
+        <a-entity id="game-panels" position="0 0 -2"></a-entity>
+        
+        <!-- Ambient Light -->
+        <a-light type="ambient" intensity="0.8"></a-light>
+        
+        <!-- Directional Light for better visibility -->
+        <a-light type="directional" intensity="0.5" position="-1 1 1"></a-light>
+    </a-scene>
+    
+    <!-- Back to non-AR UI button -->
+    <div style="position: fixed; bottom: 20px; left: 20px; z-index: 999;">
+        <button onclick="window.location.href='../index.html'" style="padding: 10px 20px; background-color: #3498db; color: white; border: none; border-radius: 5px; cursor: pointer;">
+            Exit AR Lobby
+        </button>
+    </div>
+</body>
+</html> 

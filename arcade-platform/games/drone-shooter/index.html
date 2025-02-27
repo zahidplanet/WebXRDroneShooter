@@ -1,0 +1,451 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>WebXR Drone Shooter</title>
+    <script src="https://aframe.io/releases/1.4.0/aframe.min.js"></script>
+    <script src="https://raw.githack.com/AR-js-org/AR.js/master/aframe/build/aframe-ar.js"></script>
+    <script src="https://unpkg.com/aframe-particle-system-component@1.0.x/dist/aframe-particle-system-component.min.js"></script>
+    <script>
+        // Game state management
+        AFRAME.registerSystem('game-state', {
+            schema: {},
+            init: function () {
+                this.score = 0;
+                this.gameActive = true;
+                this.droneCount = 0;
+                this.maxDrones = 10;
+                
+                // Set up global event listeners
+                this.el.addEventListener('score-point', this.onScorePoint.bind(this));
+                this.el.addEventListener('game-over', this.onGameOver.bind(this));
+                
+                // Start spawning drones
+                this.droneSpawnInterval = setInterval(this.spawnDrone.bind(this), 3000);
+            },
+            
+            spawnDrone: function () {
+                if (!this.gameActive || this.droneCount >= this.maxDrones) return;
+                
+                // Create a drone at a random position
+                const scene = this.el;
+                const drone = document.createElement('a-entity');
+                
+                // Random position in a semi-circle in front of the camera
+                const angle = Math.random() * Math.PI - (Math.PI / 2);
+                const distance = 3 + Math.random() * 2;
+                const x = Math.cos(angle) * distance;
+                const y = 1.5 + Math.random() * 1;
+                const z = Math.sin(angle) * distance;
+                
+                drone.setAttribute('id', `drone-${this.droneCount}`);
+                drone.setAttribute('position', `${x} ${y} ${z}`);
+                drone.setAttribute('drone', '');
+                drone.setAttribute('class', 'shootable');
+                
+                scene.appendChild(drone);
+                this.droneCount++;
+            },
+            
+            onScorePoint: function () {
+                this.score += 10;
+                console.log('Score:', this.score);
+                
+                // Update score display
+                const scoreEl = document.getElementById('score-text');
+                if (scoreEl) {
+                    scoreEl.setAttribute('value', `Score: ${this.score}`);
+                }
+            },
+            
+            onGameOver: function () {
+                this.gameActive = false;
+                clearInterval(this.droneSpawnInterval);
+                
+                // Show game over message
+                const gameOverEl = document.getElementById('game-over');
+                if (gameOverEl) {
+                    gameOverEl.setAttribute('visible', true);
+                }
+            }
+        });
+        
+        // Drone component
+        AFRAME.registerComponent('drone', {
+            schema: {
+                speed: {type: 'number', default: 0.5},
+                health: {type: 'number', default: 1}
+            },
+            
+            init: function () {
+                // Create drone model
+                const droneBody = document.createElement('a-box');
+                droneBody.setAttribute('width', '0.5');
+                droneBody.setAttribute('height', '0.1');
+                droneBody.setAttribute('depth', '0.5');
+                droneBody.setAttribute('color', '#E74C3C');
+                
+                // Add propellers
+                const propPositions = [
+                    {x: 0.2, y: 0.05, z: 0.2},
+                    {x: -0.2, y: 0.05, z: 0.2},
+                    {x: 0.2, y: 0.05, z: -0.2},
+                    {x: -0.2, y: 0.05, z: -0.2}
+                ];
+                
+                propPositions.forEach((pos, i) => {
+                    const prop = document.createElement('a-cylinder');
+                    prop.setAttribute('radius', '0.1');
+                    prop.setAttribute('height', '0.01');
+                    prop.setAttribute('position', `${pos.x} ${pos.y} ${pos.z}`);
+                    prop.setAttribute('color', '#95A5A6');
+                    prop.setAttribute('animation', `property: rotation; to: 0 ${360 * (i % 2 ? -1 : 1)} 0; loop: true; dur: 500; easing: linear`);
+                    droneBody.appendChild(prop);
+                });
+                
+                this.el.appendChild(droneBody);
+                
+                // Set up movement
+                this.direction = {
+                    x: Math.random() * 2 - 1,
+                    y: Math.random() * 0.5 - 0.25,
+                    z: Math.random() * 2 - 1
+                };
+                
+                // Normalize
+                const magnitude = Math.sqrt(
+                    this.direction.x * this.direction.x + 
+                    this.direction.y * this.direction.y + 
+                    this.direction.z * this.direction.z
+                );
+                
+                this.direction.x /= magnitude;
+                this.direction.y /= magnitude;
+                this.direction.z /= magnitude;
+                
+                // Make drone shootable
+                this.el.addEventListener('click', this.onShot.bind(this));
+            },
+            
+            tick: function (time, deltaTime) {
+                // Move drone
+                const pos = this.el.getAttribute('position');
+                const speed = this.data.speed * (deltaTime / 1000);
+                
+                // Random movement adjustments
+                if (Math.random() < 0.02) {
+                    this.direction.x += (Math.random() * 0.4 - 0.2);
+                    this.direction.y += (Math.random() * 0.2 - 0.1);
+                    this.direction.z += (Math.random() * 0.4 - 0.2);
+                    
+                    // Normalize again
+                    const magnitude = Math.sqrt(
+                        this.direction.x * this.direction.x + 
+                        this.direction.y * this.direction.y + 
+                        this.direction.z * this.direction.z
+                    );
+                    
+                    this.direction.x /= magnitude;
+                    this.direction.y /= magnitude;
+                    this.direction.z /= magnitude;
+                }
+                
+                // Boundary checks and movement
+                if (pos.x < -5 || pos.x > 5) this.direction.x *= -1;
+                if (pos.y < 0.5 || pos.y > 4) this.direction.y *= -1;
+                if (pos.z < -5 || pos.z > 5) this.direction.z *= -1;
+                
+                this.el.setAttribute('position', {
+                    x: pos.x + this.direction.x * speed,
+                    y: pos.y + this.direction.y * speed,
+                    z: pos.z + this.direction.z * speed
+                });
+            },
+            
+            onShot: function () {
+                // Reduce health and check if destroyed
+                this.data.health -= 1;
+                
+                if (this.data.health <= 0) {
+                    // Create explosion effect
+                    const explosion = document.createElement('a-entity');
+                    explosion.setAttribute('position', this.el.getAttribute('position'));
+                    explosion.setAttribute('particle-system', 'preset: dust; color: #E74C3C, #F39C12; particleCount: 50; maxAge: 1; duration: 0.5');
+                    this.el.sceneEl.appendChild(explosion);
+                    
+                    // Remove after explosion duration
+                    setTimeout(() => {
+                        if (explosion.parentNode) {
+                            explosion.parentNode.removeChild(explosion);
+                        }
+                    }, 1000);
+                    
+                    // Remove drone
+                    this.el.parentNode.removeChild(this.el);
+                    
+                    // Update score
+                    this.el.sceneEl.emit('score-point');
+                }
+            }
+        });
+        
+        // Shooting controller
+        AFRAME.registerComponent('shoot-controls', {
+            init: function () {
+                this.camera = document.querySelector('[camera]');
+                this.el.addEventListener('click', this.shoot.bind(this));
+            },
+            
+            shoot: function () {
+                // Create laser beam
+                const cameraPosition = this.camera.getAttribute('position');
+                const cameraDirection = new THREE.Vector3(0, 0, -1);
+                cameraDirection.applyQuaternion(this.camera.object3D.quaternion);
+                
+                const laser = document.createElement('a-entity');
+                laser.setAttribute('position', cameraPosition);
+                laser.setAttribute('laser', `direction: ${cameraDirection.x} ${cameraDirection.y} ${cameraDirection.z}`);
+                
+                this.el.sceneEl.appendChild(laser);
+                
+                // Play sound
+                const shootSound = document.getElementById('shoot-sound');
+                if (shootSound) {
+                    shootSound.components.sound.playSound();
+                }
+            }
+        });
+        
+        // Laser component
+        AFRAME.registerComponent('laser', {
+            schema: {
+                direction: {type: 'vec3', default: {x: 0, y: 0, z: -1}},
+                speed: {type: 'number', default: 10},
+                lifespan: {type: 'number', default: 1000}
+            },
+            
+            init: function () {
+                // Create laser visual
+                const laserBeam = document.createElement('a-cylinder');
+                laserBeam.setAttribute('radius', '0.05');
+                laserBeam.setAttribute('height', '2');
+                laserBeam.setAttribute('rotation', '90 0 0');
+                laserBeam.setAttribute('color', '#2ECC71');
+                laserBeam.setAttribute('material', 'shader: flat; opacity: 0.7');
+                
+                this.el.appendChild(laserBeam);
+                
+                // Set lifespan
+                setTimeout(() => {
+                    if (this.el.parentNode) {
+                        this.el.parentNode.removeChild(this.el);
+                    }
+                }, this.data.lifespan);
+                
+                // For collision detection
+                this.raycaster = new THREE.Raycaster();
+                this.direction = new THREE.Vector3(
+                    this.data.direction.x,
+                    this.data.direction.y,
+                    this.data.direction.z
+                ).normalize();
+                
+                // Align cylinder with direction
+                this.el.object3D.lookAt(
+                    this.direction.x + this.el.object3D.position.x,
+                    this.direction.y + this.el.object3D.position.y,
+                    this.direction.z + this.el.object3D.position.z
+                );
+            },
+            
+            tick: function (time, deltaTime) {
+                // Move laser
+                const pos = this.el.getAttribute('position');
+                const speed = this.data.speed * (deltaTime / 1000);
+                
+                this.el.setAttribute('position', {
+                    x: pos.x + this.direction.x * speed,
+                    y: pos.y + this.direction.y * speed,
+                    z: pos.z + this.direction.z * speed
+                });
+                
+                // Check for collisions
+                this.checkCollisions();
+            },
+            
+            checkCollisions: function () {
+                const shootables = Array.from(document.querySelectorAll('.shootable'));
+                const laserPosition = this.el.object3D.position;
+                
+                this.raycaster.set(laserPosition, this.direction);
+                const intersections = this.raycaster.intersectObjects(
+                    shootables.map(el => el.object3D), true
+                );
+                
+                if (intersections.length > 0 && intersections[0].distance < 0.5) {
+                    const hitEl = this.findAncestorWithClass(intersections[0].object.el, 'shootable');
+                    if (hitEl) {
+                        // Trigger click on the hit entity to register the shot
+                        hitEl.dispatchEvent(new CustomEvent('click'));
+                        
+                        // Remove the laser
+                        if (this.el.parentNode) {
+                            this.el.parentNode.removeChild(this.el);
+                        }
+                    }
+                }
+            },
+            
+            findAncestorWithClass: function (el, className) {
+                while (el && !el.classList.contains(className)) {
+                    el = el.parentElement;
+                }
+                return el;
+            }
+        });
+    </script>
+    <style>
+        .hud {
+            position: fixed;
+            z-index: 999;
+            color: white;
+            font-family: Arial, sans-serif;
+            pointer-events: none;
+        }
+        
+        #score-display {
+            top: 20px;
+            left: 20px;
+            font-size: 24px;
+        }
+        
+        #game-over-screen {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(0, 0, 0, 0.7);
+            z-index: 1000;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            color: white;
+            font-family: Arial, sans-serif;
+        }
+        
+        #game-over-screen h1 {
+            font-size: 48px;
+            margin-bottom: 20px;
+        }
+        
+        #game-over-screen button {
+            padding: 15px 30px;
+            font-size: 18px;
+            background-color: #2ECC71;
+            color: white;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            margin: 10px;
+        }
+        
+        #back-button {
+            position: fixed;
+            bottom: 20px;
+            left: 20px;
+            z-index: 999;
+            padding: 10px 20px;
+            background-color: #3498db;
+            color: white;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+        }
+    </style>
+</head>
+<body>
+    <a-scene 
+        embedded 
+        arjs="sourceType: webcam; debugUIEnabled: false;"
+        game-state
+        renderer="antialias: true">
+        
+        <!-- Camera with shooting capability -->
+        <a-entity camera look-controls position="0 1.6 0">
+            <a-entity 
+                cursor="fuse: false"
+                position="0 0 -1"
+                geometry="primitive: ring; radiusInner: 0.02; radiusOuter: 0.03"
+                material="color: white; shader: flat"
+                raycaster="objects: .shootable"
+                shoot-controls>
+            </a-entity>
+            
+            <!-- Crosshair -->
+            <a-entity
+                position="0 0 -1"
+                text="value: +; align: center; width: 0.1; color: #2ECC71">
+            </a-entity>
+        </a-entity>
+        
+        <!-- Game UI in 3D space -->
+        <a-entity id="score-text"
+            text="value: Score: 0; align: left; width: 2; color: white"
+            position="-0.9 1.9 -2"
+            rotation="0 0 0">
+        </a-entity>
+        
+        <!-- Game over text (hidden initially) -->
+        <a-entity id="game-over"
+            text="value: GAME OVER; align: center; width: 4; color: red"
+            position="0 1.6 -3"
+            rotation="0 0 0"
+            visible="false">
+        </a-entity>
+        
+        <!-- Sound effects -->
+        <a-entity id="shoot-sound" sound="src: url(assets/sounds/laser.mp3); poolSize: 5"></a-entity>
+        <a-entity id="explosion-sound" sound="src: url(assets/sounds/explosion.mp3); poolSize: 5"></a-entity>
+        
+        <!-- Ambient Light -->
+        <a-light type="ambient" intensity="0.8"></a-light>
+    </a-scene>
+    
+    <!-- HUD for score -->
+    <div id="score-display" class="hud">Score: 0</div>
+    
+    <!-- Game over screen (hidden initially) -->
+    <div id="game-over-screen" style="display: none;">
+        <h1>GAME OVER</h1>
+        <div>
+            <button onclick="location.reload()">Play Again</button>
+            <button onclick="window.location.href='../../lobby/index.html'">Return to Lobby</button>
+        </div>
+    </div>
+    
+    <!-- Back button to return to lobby -->
+    <button id="back-button" onclick="window.location.href='../../lobby/index.html'">
+        Return to Lobby
+    </button>
+    
+    <script>
+        // HUD update
+        const scoreSystem = document.querySelector('a-scene').systems['game-state'];
+        const hudScore = document.getElementById('score-display');
+        
+        // Update HUD score when score changes
+        document.querySelector('a-scene').addEventListener('score-point', () => {
+            hudScore.textContent = `Score: ${scoreSystem.score}`;
+        });
+        
+        // Show game over screen
+        document.querySelector('a-scene').addEventListener('game-over', () => {
+            document.getElementById('game-over-screen').style.display = 'flex';
+        });
+    </script>
+</body>
+</html> 

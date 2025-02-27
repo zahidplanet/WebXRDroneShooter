@@ -1,0 +1,27 @@
+{
+  "games": [
+    {
+      "id": "drone-shooter",
+      "title": "WebXR Drone Shooter",
+      "description": "Shoot down drones in an immersive AR experience. Works on mobile and VR headsets.",
+      "thumbnail": "../assets/thumbnails/drone-shooter.jpg",
+      "path": "drone-shooter/index.html",
+      "lastUpdated": "2023-06-15T14:48:00",
+      "featured": true,
+      "tags": ["action", "shooter", "multiplayer"]
+    }
+  ],
+  "platformSettings": {
+    "lobbyTitle": "AR-Cade Platform",
+    "featuredGamesCount": 3,
+    "defaultSortOrder": "lastUpdated",
+    "categories": [
+      "action",
+      "puzzle",
+      "adventure",
+      "strategy",
+      "multiplayer",
+      "shooter"
+    ]
+  }
+} 

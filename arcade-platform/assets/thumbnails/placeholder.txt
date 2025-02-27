@@ -1,0 +1,2 @@
+This directory will contain game thumbnails.
+In a production environment, you would add actual image files here for each game. 
