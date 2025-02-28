@@ -259,20 +259,93 @@ class Player {
      * Setup controls for local player
      */
     setupControls() {
-        this.controls = new THREE.PointerLockControls(this.camera, document.body);
+        try {
+            console.log("Setting up PointerLockControls...");
+            
+            // Check if THREE.PointerLockControls exists
+            if (!THREE.PointerLockControls) {
+                console.error("THREE.PointerLockControls is not defined. Implementation may be missing or not loaded.");
+                throw new Error("THREE.PointerLockControls is not a constructor");
+            }
+            
+            this.controls = new THREE.PointerLockControls(this.camera, document.body);
+            console.log("PointerLockControls initialized successfully");
+            
+            const startButton = document.getElementById('start-button');
+            startButton.addEventListener('click', () => {
+                this.controls.lock();
+            });
+            
+            this.controls.addEventListener('lock', () => {
+                document.getElementById('game-menu').style.display = 'none';
+            });
+            
+            this.controls.addEventListener('unlock', () => {
+                document.getElementById('game-menu').style.display = 'block';
+            });
+        } catch (error) {
+            console.error("Failed to initialize PointerLockControls:", error);
+            
+            // Fallback to basic controls for testing
+            console.log("Using fallback controls for testing...");
+            this.useFallbackControls();
+        }
+    }
+    
+    /**
+     * Fallback controls when PointerLockControls is not available
+     */
+    useFallbackControls() {
+        // Create a simple object to mimic the controls API
+        this.controls = {
+            isLocked: false,
+            lock: () => {
+                this.controls.isLocked = true;
+                document.getElementById('game-menu').style.display = 'none';
+                
+                // Dispatch a fake lock event
+                const event = new Event('lock');
+                this.controls.dispatchEvent(event);
+            },
+            unlock: () => {
+                this.controls.isLocked = false;
+                document.getElementById('game-menu').style.display = 'block';
+                
+                // Dispatch a fake unlock event
+                const event = new Event('unlock');
+                this.controls.dispatchEvent(event);
+            },
+            getDirection: () => {
+                return new THREE.Vector3(0, 0, -1);
+            },
+            addEventListener: (type, listener) => {
+                if (!this.controls._listeners) this.controls._listeners = {};
+                if (!this.controls._listeners[type]) this.controls._listeners[type] = [];
+                this.controls._listeners[type].push(listener);
+            },
+            dispatchEvent: (event) => {
+                if (!this.controls._listeners) return;
+                const listeners = this.controls._listeners[event.type];
+                if (listeners) {
+                    for (const listener of listeners) {
+                        listener(event);
+                    }
+                }
+            }
+        };
         
+        // Update game UI to show fallback controls are in use
         const startButton = document.getElementById('start-button');
+        startButton.textContent = 'Start Game (Fallback Controls)';
         startButton.addEventListener('click', () => {
             this.controls.lock();
         });
         
-        this.controls.addEventListener('lock', () => {
-            document.getElementById('game-menu').style.display = 'none';
-        });
-        
-        this.controls.addEventListener('unlock', () => {
-            document.getElementById('game-menu').style.display = 'block';
-        });
+        // Add a warning message
+        const loadingText = document.querySelector('.loading-text');
+        if (loadingText) {
+            loadingText.innerHTML += '<br><small style="color: orange;">Using fallback controls (rotation disabled)</small>';
+        }
     }
     
     /**
@@ -745,19 +818,118 @@ class Player {
     }
     
     /**
-     * Update player
+     * Update player position and rotation
      */
     update(deltaTime) {
-        if (this.isLocal) {
-            this.updatePhysics(deltaTime);
-            this.sendNetworkUpdate();
-            
-            if (this.weapon) {
-                this.weapon.update(deltaTime);
-            }
-        } else {
-            // Any update logic for remote players
+        // Skip update if not alive
+        if (!this.isAlive) {
+            this.handleRespawn(deltaTime);
+            return;
         }
+        
+        if (this.isLocal) {
+            this.handleLocalMovement(deltaTime);
+            
+            // Send player position to network
+            this.sendNetworkUpdate();
+        } else {
+            this.handleRemoteMovement(deltaTime);
+        }
+        
+        // Sync mesh position/rotation
+        this.syncMeshPosition();
+    }
+    
+    /**
+     * Handle local player movement with physics
+     */
+    handleLocalMovement(deltaTime) {
+        // Gravity
+        if (!this.onGround) {
+            this.velocity.y -= CONFIG.PLAYER.GRAVITY * deltaTime;
+        }
+        
+        // Reset movement velocity
+        this.velocity.x = 0;
+        this.velocity.z = 0;
+        
+        // Get camera direction for movement
+        const cameraDirection = new THREE.Vector3();
+        
+        if (this.controls.isLocked) {
+            try {
+                // Regular PointerLockControls
+                if (this.controls.getDirection) {
+                    this.camera.getWorldDirection(cameraDirection);
+                } else {
+                    // Fallback controls - just use camera forward
+                    cameraDirection.set(0, 0, -1).applyQuaternion(this.camera.quaternion);
+                }
+            } catch (error) {
+                // Ultra fallback - fixed direction
+                console.warn("Error getting camera direction:", error);
+                cameraDirection.set(0, 0, -1);
+            }
+            
+            // Only consider forward/backward component (not up/down)
+            cameraDirection.y = 0;
+            cameraDirection.normalize();
+            
+            // Calculate right vector
+            const rightVector = new THREE.Vector3();
+            rightVector.crossVectors(new THREE.Vector3(0, 1, 0), cameraDirection).normalize();
+            
+            // Movement based on keys
+            if (this.moveForward) {
+                this.velocity.add(cameraDirection.clone().multiplyScalar(CONFIG.PLAYER.MOVE_SPEED * deltaTime));
+            }
+            if (this.moveBackward) {
+                this.velocity.add(cameraDirection.clone().multiplyScalar(-CONFIG.PLAYER.MOVE_SPEED * deltaTime));
+            }
+            if (this.moveRight) {
+                this.velocity.add(rightVector.clone().multiplyScalar(CONFIG.PLAYER.MOVE_SPEED * deltaTime));
+            }
+            if (this.moveLeft) {
+                this.velocity.add(rightVector.clone().multiplyScalar(-CONFIG.PLAYER.MOVE_SPEED * deltaTime));
+            }
+            
+            // Jumping
+            if (this.jump && this.onGround) {
+                this.velocity.y = CONFIG.PLAYER.JUMP_FORCE;
+                this.onGround = false;
+                this.jump = false;
+                this.canJump = false;
+                
+                // Add jump cooldown
+                setTimeout(() => {
+                    this.canJump = true;
+                }, 500);
+            }
+        }
+        
+        // Apply velocity to position
+        this.position.add(this.velocity);
+        
+        // Simple collision detection with ground
+        if (this.position.y < this.height / 2) {
+            this.position.y = this.height / 2;
+            this.velocity.y = 0;
+            this.onGround = true;
+        }
+        
+        // Update controls position if using PointerLockControls
+        if (this.controls.getObject) {
+            this.controls.getObject().position.copy(this.position);
+            // Keep camera at head height
+            this.controls.getObject().position.y = this.position.y + CONFIG.PLAYER.CAMERA_HEIGHT;
+        } else {
+            // For fallback controls
+            this.camera.position.copy(this.position);
+            this.camera.position.y = this.position.y + CONFIG.PLAYER.CAMERA_HEIGHT;
+        }
+        
+        // Simple building collision
+        this.handleBuildingCollision();
     }
     
     /**
