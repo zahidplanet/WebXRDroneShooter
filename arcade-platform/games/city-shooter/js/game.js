@@ -28,8 +28,15 @@ class Game {
         this.frameCount = 0;
         this.lastFpsUpdate = 0;
         
-        // Mobile detection
+        // Mobile detection and performance options
         this.isMobile = 'ontouchstart' in window || navigator.maxTouchPoints > 0;
+        this.forceSimpleMode = window.location.search.includes('simple=true'); // URL param to force simple mode
+        
+        if (this.forceSimpleMode) {
+            console.log("Simple mode forced by URL parameter");
+            // Force mobile optimizations even on desktop
+            this.isMobile = true;
+        }
         
         // Loading state
         this.totalLoadingSteps = 5; // Number of major loading steps
@@ -107,11 +114,18 @@ class Game {
         // Adjust graphics settings for mobile
         CONFIG.RENDERING.SHADOWS = false;
         CONFIG.RENDERING.ANTIALIAS = false;
-        CONFIG.DRONE.MAX_COUNT = Math.floor(CONFIG.DRONE.MAX_COUNT * 0.6); // Reduce drone count
-        CONFIG.CITY.BUILDINGS = Math.floor(CONFIG.CITY.BUILDINGS * 0.7); // Reduce building count
+        CONFIG.DRONE.MAX_COUNT = Math.max(5, Math.floor(CONFIG.DRONE.MAX_COUNT * 0.4)); // Reduce drone count even more
+        CONFIG.CITY.BUILDINGS = Math.floor(CONFIG.CITY.BUILDINGS * 0.5); // Reduce building count more aggressively
         
-        // Reduce quality of various elements
+        // Further reduce quality of various elements
         CONFIG.RENDERING.SHADOW_MAP_SIZE = 512;
+        
+        // If using ultra-simplified mode, apply even more aggressive optimizations
+        if (this.forceSimpleMode) {
+            CONFIG.DRONE.MAX_COUNT = 5; // Absolute minimum drones
+            CONFIG.CITY.BUILDINGS = 10; // Very few buildings
+            CONFIG.RENDERING.FOG_ENABLED = false; // Disable fog completely
+        }
         
         console.log('Applied mobile optimizations');
     }

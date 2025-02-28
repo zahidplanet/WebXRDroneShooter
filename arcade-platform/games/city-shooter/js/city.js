@@ -4,28 +4,32 @@
  */
 
 class CityGenerator {
-    constructor(scene) {
-        this.scene = scene;
+    constructor(game) {
+        this.game = game;
+        this.scene = game.scene;
         this.buildings = [];
         this.streetLights = [];
         this.spawnPoints = [];
-        this.isMobile = this.scene.isMobile;
+        this.isMobile = game.isMobile;
         this.buildingMaterials = []; // Cache materials
-        this.progressiveLoading = this.isMobile; // Enable progressive loading on mobile
+        
+        // ULTRA-SIMPLIFIED mode for mobile to ensure it loads
+        this.ultraSimplified = this.isMobile;
     }
     
     /**
      * Generate the entire city
      */
     generateCity() {
+        // Create ground and skybox first
         this.createGround();
         this.createSkybox();
         
-        if (this.progressiveLoading) {
-            // On mobile, load buildings progressively for better performance
-            this.progressiveBuildingGeneration();
+        if (this.ultraSimplified) {
+            // Use super simplified city for mobile
+            this.createSimplifiedCity();
         } else {
-            // On desktop, load everything at once
+            // Normal city for desktop
             this.createBuildings();
             this.createStreetLights();
         }
@@ -33,95 +37,130 @@ class CityGenerator {
         this.createSpawnPoints();
         this.addFog();
         this.addLighting();
+        
+        console.log(`City created with ${this.buildings.length} buildings`);
     }
     
     /**
-     * Progressively generate buildings to avoid blocking the main thread on mobile
+     * Create a very simplified city for mobile devices
      */
-    progressiveBuildingGeneration() {
-        console.log("Using progressive building generation for mobile");
+    createSimplifiedCity() {
+        console.log("Creating ultra-simplified city for mobile");
         
-        // Calculate how many buildings to create
+        // Create materials cache if not created yet
+        if (this.buildingMaterials.length === 0) {
+            this.createSimplifiedMaterials();
+        }
+        
         const citySize = CONFIG.CITY.SIZE;
-        const blockSize = CONFIG.CITY.BLOCK_SIZE;
-        const streetWidth = CONFIG.CITY.STREET_WIDTH;
         
-        // Create building positions grid
-        const positions = [];
-        for (let x = -citySize/2 + blockSize/2; x < citySize/2; x += blockSize + streetWidth) {
-            for (let z = -citySize/2 + blockSize/2; z < citySize/2; z += blockSize + streetWidth) {
-                // Skip some grid positions to create empty lots
-                if (Math.random() < 0.2) continue;
+        // Create just a few buildings in a simple grid
+        const numBuildingsPerSide = 6; // 6x6 grid = 36 buildings max
+        const spacing = citySize / numBuildingsPerSide;
+        
+        let buildingCount = 0;
+        const maxBuildings = 20; // Hard limit for mobile
+        
+        // Create buildings in a grid pattern
+        for (let x = -citySize/2 + spacing/2; x < citySize/2 && buildingCount < maxBuildings; x += spacing) {
+            for (let z = -citySize/2 + spacing/2; z < citySize/2 && buildingCount < maxBuildings; z += spacing) {
+                // Skip some grid positions for variety (70% chance to create a building)
+                if (Math.random() < 0.3) continue;
                 
-                positions.push({x, z});
+                // Vary building size
+                const buildingWidth = spacing * 0.7;
+                const buildingDepth = spacing * 0.7;
+                
+                // Simple height variation
+                const buildingHeight = 5 + Math.random() * 15;
+                
+                // Create a simplified building - use box geometry with basic material
+                const buildingGeometry = new THREE.BoxGeometry(buildingWidth, buildingHeight, buildingDepth);
+                const materialIndex = Math.floor(Math.random() * this.buildingMaterials.length);
+                const building = new THREE.Mesh(buildingGeometry, this.buildingMaterials[materialIndex]);
+                
+                building.position.set(
+                    x,
+                    buildingHeight / 2,
+                    z
+                );
+                
+                building.castShadow = false;
+                building.receiveShadow = false;
+                building.name = `building_${buildingCount}`;
+                
+                this.scene.add(building);
+                this.buildings.push(building);
+                buildingCount++;
             }
         }
         
-        // Shuffle positions for more natural progressive loading
-        this.shuffleArray(positions);
+        // Create just a few street lights (much fewer than normal)
+        this.createSimplifiedStreetLights(numBuildingsPerSide);
         
-        // Reduce number of buildings on mobile
-        const buildingCount = this.isMobile ? 
-            Math.min(30, positions.length) : 
-            Math.min(CONFIG.CITY.BUILDINGS, positions.length);
-        
-        // Create materials cache
-        this.createBuildingMaterials();
-        
-        // Create buildings progressively
-        let currentIndex = 0;
-        
-        const createNextBatch = () => {
-            const batchSize = 5; // Create 5 buildings per frame
-            const endIndex = Math.min(currentIndex + batchSize, buildingCount);
-            
-            for (let i = currentIndex; i < endIndex; i++) {
-                if (i < positions.length) {
-                    this.createSingleBuilding(positions[i].x, positions[i].z);
-                }
-            }
-            
-            currentIndex = endIndex;
-            
-            // Update progress if we have access to the game instance
-            if (this.scene.updateLoadingProgress && currentIndex < buildingCount) {
-                const progressPercentage = (currentIndex / buildingCount) * 100;
-                console.log(`Building city: ${Math.floor(progressPercentage)}%`);
-            }
-            
-            // Continue if not finished
-            if (currentIndex < buildingCount) {
-                setTimeout(createNextBatch, 0);
-            } else {
-                // When buildings are done, create street lights
-                this.createStreetLights();
-                console.log("Progressive building generation complete");
-            }
-        };
-        
-        // Start the progressive loading
-        createNextBatch();
+        console.log(`Created simplified city with ${buildingCount} buildings`);
     }
     
     /**
-     * Create cached materials for buildings
+     * Create simplified materials for mobile
      */
-    createBuildingMaterials() {
+    createSimplifiedMaterials() {
+        // Just two materials for buildings to reduce state changes
         this.buildingMaterials = [
-            new THREE.MeshStandardMaterial({ color: 0x555555, roughness: 0.7, metalness: 0.2 }), // Gray
-            new THREE.MeshStandardMaterial({ color: 0x333333, roughness: 0.6, metalness: 0.3 }), // Dark gray
-            new THREE.MeshStandardMaterial({ color: 0x666666, roughness: 0.8, metalness: 0.1 }), // Light gray
-            new THREE.MeshStandardMaterial({ color: 0x775533, roughness: 0.7, metalness: 0.0 })  // Brown
+            new THREE.MeshBasicMaterial({ color: 0x555555 }), // Gray
+            new THREE.MeshBasicMaterial({ color: 0x333333 })  // Dark gray
         ];
+    }
+    
+    /**
+     * Create simplified street lights for mobile
+     */
+    createSimplifiedStreetLights(gridSize) {
+        const citySize = CONFIG.CITY.SIZE;
+        const spacing = citySize / gridSize;
         
-        // Window material (emissive for nighttime)
-        this.windowMaterial = new THREE.MeshStandardMaterial({
-            color: 0xFFFFFF,
-            emissive: 0xFFFF99,
-            emissiveIntensity: 0.2,
-            roughness: 0.5,
-            metalness: 0.8
-        });
+        // Unified materials for all lights to reduce draw calls
+        const poleMaterial = new THREE.MeshBasicMaterial({ color: 0x333333 });
+        const bulbMaterial = new THREE.MeshBasicMaterial({ color: 0xFFFFAA });
+        
+        // Create lights at grid intersections
+        const numLights = 4; // Just a few lights for mobile
+        const lightPositions = [];
+        
+        // Add lights at key positions
+        for (let i = 0; i < numLights; i++) {
+            // Distribute lights around the center
+            const angle = (i / numLights) * Math.PI * 2;
+            const radius = citySize / 4;
+            
+            const x = Math.cos(angle) * radius;
+            const z = Math.sin(angle) * radius;
+            
+            lightPositions.push({ x, z });
+        }
+        
+        // Create the lights
+        for (const pos of lightPositions) {
+            // Simple pole
+            const poleGeometry = new THREE.CylinderGeometry(0.2, 0.2, 6, 4);
+            const pole = new THREE.Mesh(poleGeometry, poleMaterial);
+            pole.position.set(pos.x, 3, pos.z);
+            this.scene.add(pole);
+            
+            // Simple bulb
+            const bulbGeometry = new THREE.SphereGeometry(0.5, 4, 4);
+            const bulb = new THREE.Mesh(bulbGeometry, bulbMaterial);
+            bulb.position.set(pos.x, 6, pos.z);
+            this.scene.add(bulb);
+            
+            // Add a point light
+            const light = new THREE.PointLight(0xFFFFAA, 1, 50);
+            light.position.set(pos.x, 6, pos.z);
+            light.castShadow = false;
+            this.scene.add(light);
+            
+            this.streetLights.push({ pole, bulb, light });
+        }
     }
     
     /**
@@ -130,147 +169,84 @@ class CityGenerator {
     createGround() {
         const citySize = CONFIG.CITY.SIZE;
         
-        // Create ground geometry and material
+        // Create ground with simplified material on mobile
         const groundGeometry = new THREE.PlaneGeometry(citySize, citySize);
-        const groundMaterial = new THREE.MeshStandardMaterial({
-            color: CONFIG.CITY.GROUND_COLOR,
-            roughness: 0.8,
-            metalness: 0.2
-        });
+        const groundMaterial = this.isMobile ? 
+            new THREE.MeshBasicMaterial({ color: CONFIG.CITY.GROUND_COLOR }) : 
+            new THREE.MeshStandardMaterial({
+                color: CONFIG.CITY.GROUND_COLOR,
+                roughness: 0.8,
+                metalness: 0.2
+            });
         
         // Create ground mesh
         const ground = new THREE.Mesh(groundGeometry, groundMaterial);
         ground.rotation.x = -Math.PI / 2; // Rotate to be horizontal
         ground.position.y = 0;
-        ground.receiveShadow = true;
+        ground.receiveShadow = !this.isMobile;
         
         // Add ground to scene
         this.scene.add(ground);
         
-        // Create a grid of streets
-        this.createStreets();
-    }
-    
-    /**
-     * Create streets in a grid pattern
-     */
-    createStreets() {
-        const citySize = CONFIG.CITY.SIZE;
-        const blockSize = CONFIG.CITY.BLOCK_SIZE;
-        const streetWidth = CONFIG.CITY.STREET_WIDTH;
-        const streets = [];
-        
-        // Material for streets
-        const streetMaterial = new THREE.MeshStandardMaterial({
-            color: 0x222222,
-            roughness: 0.9,
-            metalness: 0.1
-        });
-        
-        // Create north-south streets
-        for (let x = -citySize/2 + blockSize; x < citySize/2; x += blockSize + streetWidth) {
-            const streetGeometry = new THREE.PlaneGeometry(streetWidth, citySize);
-            const street = new THREE.Mesh(streetGeometry, streetMaterial);
-            street.rotation.x = -Math.PI / 2; // Horizontal
-            street.position.set(x, 0.05, 0); // Slightly above ground to prevent z-fighting
-            street.receiveShadow = true;
-            streets.push(street);
-            this.scene.add(street);
-        }
-        
-        // Create east-west streets
-        for (let z = -citySize/2 + blockSize; z < citySize/2; z += blockSize + streetWidth) {
-            const streetGeometry = new THREE.PlaneGeometry(citySize, streetWidth);
-            const street = new THREE.Mesh(streetGeometry, streetMaterial);
-            street.rotation.x = -Math.PI / 2; // Horizontal
-            street.position.set(0, 0.05, z); // Slightly above ground to prevent z-fighting
-            street.receiveShadow = true;
-            streets.push(street);
-            this.scene.add(street);
-        }
-        
-        // Add street markings
-        this.addStreetMarkings(streets);
-    }
-    
-    /**
-     * Add markings to streets (centerlines, crosswalks, etc.)
-     */
-    addStreetMarkings(streets) {
-        const citySize = CONFIG.CITY.SIZE;
-        const blockSize = CONFIG.CITY.BLOCK_SIZE;
-        const streetWidth = CONFIG.CITY.STREET_WIDTH;
-        
-        // Material for street markings
-        const markingMaterial = new THREE.MeshBasicMaterial({
-            color: 0xFFFFFF
-        });
-        
-        // Create centerlines for north-south streets
-        for (let x = -citySize/2 + blockSize; x < citySize/2; x += blockSize + streetWidth) {
-            const lineGeometry = new THREE.PlaneGeometry(0.5, citySize);
-            const line = new THREE.Mesh(lineGeometry, markingMaterial);
-            line.rotation.x = -Math.PI / 2; // Horizontal
-            line.position.set(x, 0.06, 0); // Slightly above street
-            this.scene.add(line);
-        }
-        
-        // Create centerlines for east-west streets
-        for (let z = -citySize/2 + blockSize; z < citySize/2; z += blockSize + streetWidth) {
-            const lineGeometry = new THREE.PlaneGeometry(citySize, 0.5);
-            const line = new THREE.Mesh(lineGeometry, markingMaterial);
-            line.rotation.x = -Math.PI / 2; // Horizontal
-            line.position.set(0, 0.06, z); // Slightly above street
-            this.scene.add(line);
-        }
-        
-        // Create crosswalks at intersections
-        for (let x = -citySize/2 + blockSize; x < citySize/2; x += blockSize + streetWidth) {
-            for (let z = -citySize/2 + blockSize; z < citySize/2; z += blockSize + streetWidth) {
-                // Create crosswalks in each direction
-                for (let dir = 0; dir < 4; dir++) {
-                    const crosswalkGeometry = new THREE.PlaneGeometry(streetWidth - 2, 5);
-                    const crosswalk = new THREE.Mesh(crosswalkGeometry, markingMaterial);
-                    crosswalk.rotation.x = -Math.PI / 2; // Horizontal
-                    
-                    // Position based on direction
-                    let posX = x;
-                    let posZ = z;
-                    let rotY = 0;
-                    
-                    if (dir === 0) { // North
-                        posZ -= 7;
-                    } else if (dir === 1) { // East
-                        posX += 7;
-                        rotY = Math.PI / 2;
-                    } else if (dir === 2) { // South
-                        posZ += 7;
-                    } else { // West
-                        posX -= 7;
-                        rotY = Math.PI / 2;
-                    }
-                    
-                    crosswalk.rotation.y = rotY;
-                    crosswalk.position.set(posX, 0.07, posZ); // Slightly above centerlines
-                    this.scene.add(crosswalk);
-                }
-            }
-        }
-        
-        // On mobile, reduce the number of markings
+        // Create a grid of streets (simplified on mobile)
         if (this.isMobile) {
-            // Reduce crosswalk density on mobile
-            const skipFactor = 2; // Only create crosswalks at every other intersection
-            // ... [modification to create fewer crosswalks]
+            this.createSimplifiedStreets();
+        } else {
+            this.createStreets();
         }
+    }
+    
+    /**
+     * Create simplified streets for mobile
+     */
+    createSimplifiedStreets() {
+        const citySize = CONFIG.CITY.SIZE;
+        const streetWidth = 10;
+        
+        // Just create two crossing streets
+        const streetMaterial = new THREE.MeshBasicMaterial({ color: 0x333333 });
+        
+        // North-South street
+        const nsStreetGeometry = new THREE.PlaneGeometry(streetWidth, citySize);
+        const nsStreet = new THREE.Mesh(nsStreetGeometry, streetMaterial);
+        nsStreet.rotation.x = -Math.PI / 2; // Horizontal
+        nsStreet.position.set(0, 0.05, 0);
+        this.scene.add(nsStreet);
+        
+        // East-West street
+        const ewStreetGeometry = new THREE.PlaneGeometry(citySize, streetWidth);
+        const ewStreet = new THREE.Mesh(ewStreetGeometry, streetMaterial);
+        ewStreet.rotation.x = -Math.PI / 2; // Horizontal
+        ewStreet.position.set(0, 0.05, 0);
+        this.scene.add(ewStreet);
+        
+        // Add minimal street markings
+        const markingMaterial = new THREE.MeshBasicMaterial({ color: 0xFFFFFF });
+        
+        // Center line for NS street
+        const nsLineGeometry = new THREE.PlaneGeometry(0.5, citySize);
+        const nsLine = new THREE.Mesh(nsLineGeometry, markingMaterial);
+        nsLine.rotation.x = -Math.PI / 2;
+        nsLine.position.set(0, 0.06, 0);
+        this.scene.add(nsLine);
+        
+        // Center line for EW street
+        const ewLineGeometry = new THREE.PlaneGeometry(citySize, 0.5);
+        const ewLine = new THREE.Mesh(ewLineGeometry, markingMaterial);
+        ewLine.rotation.x = -Math.PI / 2;
+        ewLine.position.set(0, 0.06, 0);
+        this.scene.add(ewLine);
     }
     
     /**
      * Create a skybox for the scene
      */
     createSkybox() {
+        // Simpler skybox on mobile
+        const segments = this.isMobile ? 16 : 32;
+        
         // Create a large sphere to serve as the sky
-        const skyGeometry = new THREE.SphereGeometry(CONFIG.CITY.SIZE, 32, 32);
+        const skyGeometry = new THREE.SphereGeometry(CONFIG.CITY.SIZE, segments, segments);
         const skyMaterial = new THREE.MeshBasicMaterial({
             color: CONFIG.CITY.SKY_COLOR,
             side: THREE.BackSide // Render on the inside of the sphere
@@ -278,6 +254,137 @@ class CityGenerator {
         
         const sky = new THREE.Mesh(skyGeometry, skyMaterial);
         this.scene.add(sky);
+    }
+    
+    /**
+     * Add fog to the scene
+     */
+    addFog() {
+        // Skip fog on mobile for better performance
+        if (!this.isMobile) {
+            this.scene.fog = new THREE.FogExp2(0xCCCCCC, CONFIG.CITY.FOG_DENSITY);
+        }
+    }
+    
+    /**
+     * Add lighting to the scene
+     */
+    addLighting() {
+        // Add ambient light
+        const ambientLight = new THREE.AmbientLight(0xFFFFFF, CONFIG.CITY.AMBIENT_LIGHT_INTENSITY);
+        this.scene.add(ambientLight);
+        
+        // On mobile, skip directional light and shadows
+        if (!this.isMobile) {
+            // Add directional light (sun)
+            const sunlight = new THREE.DirectionalLight(0xFFFFFF, CONFIG.CITY.SUN_LIGHT_INTENSITY);
+            sunlight.position.set(200, 400, 300);
+            sunlight.castShadow = true;
+            
+            // Configure shadow properties
+            sunlight.shadow.mapSize.width = CONFIG.RENDER.SHADOW_MAP_SIZE;
+            sunlight.shadow.mapSize.height = CONFIG.RENDER.SHADOW_MAP_SIZE;
+            const shadowSize = CONFIG.CITY.SIZE / 2;
+            sunlight.shadow.camera.left = -shadowSize;
+            sunlight.shadow.camera.right = shadowSize;
+            sunlight.shadow.camera.top = shadowSize;
+            sunlight.shadow.camera.bottom = -shadowSize;
+            sunlight.shadow.camera.near = 1;
+            sunlight.shadow.camera.far = 1000;
+            
+            this.scene.add(sunlight);
+        }
+    }
+    
+    /**
+     * Create spawn points for players
+     */
+    createSpawnPoints() {
+        const citySize = CONFIG.CITY.SIZE;
+        // Fewer spawn points on mobile
+        const numSpawnPoints = this.isMobile ? 5 : 20;
+        
+        for (let i = 0; i < numSpawnPoints; i++) {
+            let spawnPoint;
+            
+            if (i < (numSpawnPoints/2) && this.buildings.length > 0 && !this.isMobile) {
+                // Rooftop spawn points (only on desktop)
+                const randomBuildingIndex = Math.floor(Math.random() * this.buildings.length);
+                const building = this.buildings[randomBuildingIndex];
+                
+                // Get building dimensions
+                const buildingSize = new THREE.Vector3();
+                building.geometry.computeBoundingBox();
+                building.geometry.boundingBox.getSize(buildingSize);
+                
+                spawnPoint = new THREE.Vector3(
+                    building.position.x,
+                    building.position.y + buildingSize.y/2 + 1, // On top of building with a small offset
+                    building.position.z
+                );
+            } else {
+                // Street-level spawn points
+                spawnPoint = new THREE.Vector3(
+                    (Math.random() - 0.5) * citySize * 0.9,
+                    1.8, // Player height
+                    (Math.random() - 0.5) * citySize * 0.9
+                );
+            }
+            
+            this.spawnPoints.push(spawnPoint);
+        }
+    }
+    
+    /**
+     * Check for collisions with buildings
+     */
+    checkCollision(position, radius = 1) {
+        // Simplified collision detection for mobile
+        if (this.isMobile) {
+            for (const building of this.buildings) {
+                const dx = position.x - building.position.x;
+                const dz = position.z - building.position.z;
+                const distance = Math.sqrt(dx*dx + dz*dz);
+                
+                // Get building dimensions (simplified as box)
+                const size = new THREE.Vector3();
+                building.geometry.computeBoundingBox();
+                building.geometry.boundingBox.getSize(size);
+                
+                // Simple radius check
+                if (distance < (Math.max(size.x, size.z)/2 + radius)) {
+                    return true;
+                }
+            }
+            return false;
+        }
+        
+        // Original collision detection for desktop
+        for (const building of this.buildings) {
+            const buildingBox = new THREE.Box3().setFromObject(building);
+            
+            // Expand box by radius for character collision
+            buildingBox.min.x -= radius;
+            buildingBox.min.z -= radius;
+            buildingBox.max.x += radius;
+            buildingBox.max.z += radius;
+            
+            // Only check X and Z coordinates
+            if (position.x >= buildingBox.min.x && position.x <= buildingBox.max.x &&
+                position.z >= buildingBox.min.z && position.z <= buildingBox.max.z) {
+                return true;
+            }
+        }
+        return false;
+    }
+    
+    /**
+     * Get a random spawn point
+     */
+    getRandomSpawnPoint() {
+        if (this.spawnPoints.length === 0) return new THREE.Vector3(0, 2, 0);
+        const index = Math.floor(Math.random() * this.spawnPoints.length);
+        return this.spawnPoints[index].clone();
     }
     
     /**
@@ -431,111 +538,6 @@ class CityGenerator {
     }
     
     /**
-     * Create spawn points for players
-     */
-    createSpawnPoints() {
-        const citySize = CONFIG.CITY.SIZE;
-        const numSpawnPoints = 20;
-        
-        for (let i = 0; i < numSpawnPoints; i++) {
-            // Create spawn points on rooftops and around the city
-            let spawnPoint;
-            
-            if (i < 10 && this.buildings.length > 0) {
-                // Rooftop spawn points
-                const randomBuildingIndex = Math.floor(Math.random() * this.buildings.length);
-                const building = this.buildings[randomBuildingIndex];
-                
-                // Get building dimensions
-                const buildingSize = new THREE.Vector3();
-                building.geometry.computeBoundingBox();
-                building.geometry.boundingBox.getSize(buildingSize);
-                
-                spawnPoint = new THREE.Vector3(
-                    building.position.x + (Math.random() - 0.5) * (buildingSize.x * 0.8),
-                    building.position.y + buildingSize.y/2 + 1, // On top of building with a small offset
-                    building.position.z + (Math.random() - 0.5) * (buildingSize.z * 0.8)
-                );
-            } else {
-                // Street-level spawn points
-                spawnPoint = new THREE.Vector3(
-                    (Math.random() - 0.5) * citySize * 0.9,
-                    1.8, // Player height
-                    (Math.random() - 0.5) * citySize * 0.9
-                );
-            }
-            
-            this.spawnPoints.push(spawnPoint);
-        }
-    }
-    
-    /**
-     * Add fog to the scene
-     */
-    addFog() {
-        this.scene.fog = new THREE.FogExp2(0xCCCCCC, CONFIG.CITY.FOG_DENSITY);
-    }
-    
-    /**
-     * Add lighting to the scene
-     */
-    addLighting() {
-        // Add ambient light
-        const ambientLight = new THREE.AmbientLight(0xFFFFFF, CONFIG.CITY.AMBIENT_LIGHT_INTENSITY);
-        this.scene.add(ambientLight);
-        
-        // Add directional light (sun)
-        const sunlight = new THREE.DirectionalLight(0xFFFFFF, CONFIG.CITY.SUN_LIGHT_INTENSITY);
-        sunlight.position.set(200, 400, 300);
-        sunlight.castShadow = true;
-        
-        // Configure shadow properties
-        sunlight.shadow.mapSize.width = CONFIG.RENDER.SHADOW_MAP_SIZE;
-        sunlight.shadow.mapSize.height = CONFIG.RENDER.SHADOW_MAP_SIZE;
-        const shadowSize = CONFIG.CITY.SIZE / 2;
-        sunlight.shadow.camera.left = -shadowSize;
-        sunlight.shadow.camera.right = shadowSize;
-        sunlight.shadow.camera.top = shadowSize;
-        sunlight.shadow.camera.bottom = -shadowSize;
-        sunlight.shadow.camera.near = 1;
-        sunlight.shadow.camera.far = 1000;
-        
-        this.scene.add(sunlight);
-    }
-    
-    /**
-     * Get a random spawn point
-     */
-    getRandomSpawnPoint() {
-        if (this.spawnPoints.length === 0) return new THREE.Vector3(0, 2, 0);
-        const index = Math.floor(Math.random() * this.spawnPoints.length);
-        return this.spawnPoints[index].clone();
-    }
-    
-    /**
-     * Check for collisions with buildings
-     */
-    checkCollision(position, radius = 1) {
-        // Simplified collision detection using bounding boxes
-        for (const building of this.buildings) {
-            const buildingBox = new THREE.Box3().setFromObject(building);
-            
-            // Expand box by radius for character collision
-            buildingBox.min.x -= radius;
-            buildingBox.min.z -= radius;
-            buildingBox.max.x += radius;
-            buildingBox.max.z += radius;
-            
-            // Only check X and Z coordinates
-            if (position.x >= buildingBox.min.x && position.x <= buildingBox.max.x &&
-                position.z >= buildingBox.min.z && position.z <= buildingBox.max.z) {
-                return true;
-            }
-        }
-        return false;
-    }
-    
-    /**
      * Clean up resources
      */
     dispose() {
@@ -561,16 +563,5 @@ class CityGenerator {
         this.buildings = [];
         this.streetLights = [];
         this.spawnPoints = [];
-    }
-    
-    /**
-     * Utility method to shuffle an array
-     */
-    shuffleArray(array) {
-        for (let i = array.length - 1; i > 0; i--) {
-            const j = Math.floor(Math.random() * (i + 1));
-            [array[i], array[j]] = [array[j], array[i]];
-        }
-        return array;
     }
 } 
