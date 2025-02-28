@@ -8,6 +8,9 @@
     <title>City Drone Shooter - AR-Cade Platform</title>
     <link rel="icon" type="image/png" href="../../assets/favicon.png">
     
+    <!-- Preload critical resources -->
+    <link rel="preload" href="https://cdn.jsdelivr.net/npm/three@0.149.0/build/three.min.js" as="script">
+    
     <style>
         * {
             margin: 0;
@@ -64,6 +67,7 @@
         .loading-text {
             font-size: 24px;
             text-align: center;
+            margin-bottom: 20px;
         }
         
         .progress-bar {
@@ -283,7 +287,22 @@
             font-size: 12px;
             display: none;
         }
+        
+        /* Loading tips */
+        #loading-tips {
+            position: absolute;
+            bottom: 20px;
+            left: 0;
+            right: 0;
+            text-align: center;
+            padding: 10px;
+            font-size: 14px;
+            color: #aaa;
+        }
     </style>
+    
+    <!-- Load Three.js early -->
+    <script src="https://cdn.jsdelivr.net/npm/three@0.149.0/build/three.min.js"></script>
 </head>
 <body>
     <!-- Game Container -->
@@ -295,6 +314,9 @@
         <div class="loading-text">Loading City Drone Shooter...</div>
         <div class="progress-bar">
             <div class="progress-bar-fill" id="loading-progress"></div>
+        </div>
+        <div id="loading-tips">
+            Tip: Use WASD to move and mouse to look around. Click to shoot drones.
         </div>
     </div>
     
@@ -350,23 +372,43 @@
     <!-- Debug Info -->
     <div id="debug-info"></div>
     
-    <!-- Scripts -->
-    <script src="https://cdn.jsdelivr.net/npm/three@0.149.0/build/three.min.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/three@0.149.0/examples/js/controls/PointerLockControls.js"></script>
-    <script src="https://cdn.colyseus.io/client/0.14.13/colyseus.js"></script>
+    <!-- Scripts are loaded with defer to improve page load performance -->
+    <script src="https://cdn.jsdelivr.net/npm/three@0.149.0/examples/js/controls/PointerLockControls.js" defer></script>
+    <script src="https://cdn.colyseus.io/client/0.14.13/colyseus.js" defer></script>
     
     <!-- Game Scripts -->
-    <script src="js/config.js"></script>
-    <script src="js/network.js"></script>
-    <script src="js/city.js"></script>
-    <script src="js/player.js"></script>
-    <script src="js/drone.js"></script>
-    <script src="js/weapon.js"></script>
-    <script src="js/game.js"></script>
+    <script src="js/config.js" defer></script>
+    <script src="js/network.js" defer></script>
+    <script src="js/city.js" defer></script>
+    <script src="js/player.js" defer></script>
+    <script src="js/drone.js" defer></script>
+    <script src="js/weapon.js" defer></script>
+    <script src="js/game.js" defer></script>
     
     <script>
-        // Mobile controls detection
+        // Start loading animation immediately
         document.addEventListener('DOMContentLoaded', function() {
+            // Show loading tips while waiting for scripts to load
+            const tips = [
+                "Tip: Use WASD to move and mouse to look around. Click to shoot drones.",
+                "Tip: Press R to reload your weapon.",
+                "Tip: Press ESC to pause the game.",
+                "Tip: Drones come in different types with varying health and speed.",
+                "Tip: Explore the city to find good vantage points."
+            ];
+            
+            const loadingTips = document.getElementById('loading-tips');
+            let tipIndex = 0;
+            
+            // Change loading tip every 5 seconds
+            if (loadingTips) {
+                setInterval(() => {
+                    tipIndex = (tipIndex + 1) % tips.length;
+                    loadingTips.textContent = tips[tipIndex];
+                }, 5000);
+            }
+            
+            // Mobile controls detection - moved to after page load
             const isMobile = 'ontouchstart' in window || navigator.maxTouchPoints > 0;
             
             if (isMobile) {
@@ -401,12 +443,12 @@
             
             // Options button
             document.getElementById('options-button').addEventListener('click', function() {
-                alert('Options menu not implemented in this demo.');
+                alert('Controls:\nMovement: WASD\nJump: SPACE\nShoot: Left Mouse Button\nReload: R\nPause: ESC');
             });
             
             // Help button
             document.getElementById('help-button').addEventListener('click', function() {
-                alert('Controls:\n\nMovement: WASD\nJump: SPACE\nShoot: Left Mouse Button\nReload: R\nPause: ESC\n\nGoal: Shoot down as many drones as possible!');
+                alert('Objective: Shoot down as many drones as possible!\n\nControls:\nMovement: WASD\nJump: SPACE\nShoot: Left Mouse Button\nReload: R\nPause: ESC');
             });
         });
     </script>

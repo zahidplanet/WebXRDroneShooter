@@ -31,6 +31,10 @@ class Game {
         // Mobile detection
         this.isMobile = 'ontouchstart' in window || navigator.maxTouchPoints > 0;
         
+        // Loading state
+        this.totalLoadingSteps = 5; // Number of major loading steps
+        this.loadingProgress = 0;
+        
         // Bind methods
         this.update = this.update.bind(this);
         this.onWindowResize = this.onWindowResize.bind(this);
@@ -45,6 +49,7 @@ class Game {
         
         try {
             // Initialize core components
+            this.updateLoadingProgress('Initializing graphics engine...', 0);
             this.initThreeJS();
             this.addEventListeners();
             
@@ -53,21 +58,33 @@ class Game {
                 this.initStats();
             }
             
+            // Apply mobile optimizations if needed
+            if (this.isMobile) {
+                this.applyMobileOptimizations();
+            }
+            
             // Initialize networking
+            this.updateLoadingProgress('Connecting to network...', 1);
             this.networkManager = new NetworkManager(this);
             await this.networkManager.init();
             
             // Generate city environment
+            this.updateLoadingProgress('Generating city environment...', 2);
             this.cityGenerator = new CityGenerator(this);
             this.cityGenerator.generateCity();
             
             // Initialize drone manager
+            this.updateLoadingProgress('Preparing enemy drones...', 3);
             this.droneManager = new DroneManager(this);
             this.droneManager.init();
             
             // Initialize player manager
+            this.updateLoadingProgress('Setting up player controls...', 4);
             this.playerManager = new PlayerManager(this);
             this.playerManager.init();
+            
+            // Final setup
+            this.updateLoadingProgress('Ready to play!', 5);
             
             // Success
             console.log('Game initialized successfully');
@@ -81,6 +98,43 @@ class Game {
             this.showErrorScreen('Failed to initialize game: ' + error.message);
             return false;
         }
+    }
+    
+    /**
+     * Apply mobile-specific optimizations
+     */
+    applyMobileOptimizations() {
+        // Adjust graphics settings for mobile
+        CONFIG.RENDERING.SHADOWS = false;
+        CONFIG.RENDERING.ANTIALIAS = false;
+        CONFIG.DRONE.MAX_COUNT = Math.floor(CONFIG.DRONE.MAX_COUNT * 0.6); // Reduce drone count
+        CONFIG.CITY.BUILDINGS = Math.floor(CONFIG.CITY.BUILDINGS * 0.7); // Reduce building count
+        
+        // Reduce quality of various elements
+        CONFIG.RENDERING.SHADOW_MAP_SIZE = 512;
+        
+        console.log('Applied mobile optimizations');
+    }
+    
+    /**
+     * Update the loading progress
+     */
+    updateLoadingProgress(statusText, step) {
+        const progressBar = document.getElementById('loading-progress');
+        const loadingText = document.querySelector('.loading-text');
+        
+        if (progressBar && loadingText) {
+            // Update progress bar
+            const progressPercentage = (step / this.totalLoadingSteps) * 100;
+            progressBar.style.width = `${progressPercentage}%`;
+            
+            // Update status text
+            loadingText.textContent = statusText;
+            
+            console.log(`Loading: ${statusText} (${progressPercentage}%)`);
+        }
+        
+        this.loadingProgress = step;
     }
     
     /**
@@ -98,14 +152,16 @@ class Game {
             CONFIG.RENDERING.FAR_PLANE
         );
         
-        // Create renderer
+        // Create renderer with appropriate settings for the device
         this.renderer = new THREE.WebGLRenderer({
             antialias: !this.isMobile && CONFIG.RENDERING.ANTIALIAS,
-            powerPreference: 'high-performance'
+            powerPreference: 'high-performance',
+            alpha: false,
+            precision: this.isMobile ? 'mediump' : 'highp' // Lower precision on mobile
         });
         
         this.renderer.setSize(window.innerWidth, window.innerHeight);
-        this.renderer.setPixelRatio(window.devicePixelRatio > 2 ? 2 : window.devicePixelRatio);
+        this.renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2)); // Cap pixel ratio at 2
         this.renderer.shadowMap.enabled = CONFIG.RENDERING.SHADOWS;
         this.renderer.shadowMap.type = THREE.PCFSoftShadowMap;
         

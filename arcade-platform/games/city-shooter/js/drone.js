@@ -12,6 +12,23 @@ class DroneManager {
         this.lastSpawnTime = 0;
         this.spawnInterval = CONFIG.DRONE.SPAWN_INTERVAL;
         this.maxDrones = CONFIG.DRONE.MAX_COUNT;
+        this.isMobile = game.isMobile;
+        
+        // Apply mobile optimizations
+        if (this.isMobile) {
+            this.applyMobileOptimizations();
+        }
+    }
+    
+    /**
+     * Apply mobile-specific optimizations
+     */
+    applyMobileOptimizations() {
+        // Reduce drone count and complexity for mobile
+        this.maxDrones = Math.max(5, Math.floor(CONFIG.DRONE.MAX_COUNT * 0.5)); // 50% of normal count, minimum 5
+        this.spawnInterval = CONFIG.DRONE.SPAWN_INTERVAL * 1.5; // Slower spawn rate
+        
+        console.log(`Mobile optimizations applied: Max drones = ${this.maxDrones}, Spawn interval = ${this.spawnInterval}ms`);
     }
     
     /**
@@ -53,11 +70,16 @@ class DroneManager {
         // Drone body - center sphere 
         const body = new THREE.Group();
         
+        // Determine detail level based on device capability
+        const detailLevel = this.isMobile ? 
+            { sphereSegments: 8, propSegments: 4 } : 
+            { sphereSegments: 16, propSegments: 8 };
+        
         // Body sphere
-        const bodyGeometry = new THREE.SphereGeometry(0.5 * type.scale, 16, 12);
+        const bodyGeometry = new THREE.SphereGeometry(0.5 * type.scale, detailLevel.sphereSegments, detailLevel.sphereSegments);
         const bodyMaterial = new THREE.MeshLambertMaterial({ color: type.color });
         const bodySphere = new THREE.Mesh(bodyGeometry, bodyMaterial);
-        bodySphere.castShadow = true;
+        bodySphere.castShadow = !this.isMobile && CONFIG.RENDERING.SHADOWS;
         body.add(bodySphere);
         
         // Add propeller arms
@@ -71,7 +93,7 @@ class DroneManager {
             const armMaterial = new THREE.MeshLambertMaterial({ color: 0x333333 });
             const arm = new THREE.Mesh(armGeometry, armMaterial);
             arm.position.z = armLength / 2;
-            arm.castShadow = true;
+            arm.castShadow = !this.isMobile && CONFIG.RENDERING.SHADOWS;
             armGroup.add(arm);
             
             // Propeller
@@ -80,7 +102,7 @@ class DroneManager {
             const propeller = new THREE.Mesh(propGeometry, propMaterial);
             propeller.position.z = armLength;
             propeller.name = `propeller_${i}`;
-            propeller.castShadow = true;
+            propeller.castShadow = !this.isMobile && CONFIG.RENDERING.SHADOWS;
             armGroup.add(propeller);
             
             // Position arm at the correct angle
@@ -88,38 +110,45 @@ class DroneManager {
             body.add(armGroup);
         }
         
-        // Add camera/sensor on bottom
-        const cameraGeometry = new THREE.CylinderGeometry(0.15 * type.scale, 0.15 * type.scale, 0.2 * type.scale, 8);
-        const cameraMaterial = new THREE.MeshLambertMaterial({ color: 0x111111 });
-        const camera = new THREE.Mesh(cameraGeometry, cameraMaterial);
-        camera.rotation.x = Math.PI / 2;
-        camera.position.y = -0.3 * type.scale;
-        body.add(camera);
-        
-        // Add lights to the drone
-        const lightGeometry = new THREE.SphereGeometry(0.06 * type.scale, 8, 8);
-        const redLightMaterial = new THREE.MeshBasicMaterial({ color: 0xFF0000, emissive: 0xFF0000 });
-        const greenLightMaterial = new THREE.MeshBasicMaterial({ color: 0x00FF00, emissive: 0x00FF00 });
-        
-        // Front-right light (red)
-        const frontRightLight = new THREE.Mesh(lightGeometry, redLightMaterial);
-        frontRightLight.position.set(0.4 * type.scale, 0, 0.4 * type.scale);
-        body.add(frontRightLight);
-        
-        // Back-left light (red)
-        const backLeftLight = new THREE.Mesh(lightGeometry, redLightMaterial);
-        backLeftLight.position.set(-0.4 * type.scale, 0, -0.4 * type.scale);
-        body.add(backLeftLight);
-        
-        // Front-left light (green)
-        const frontLeftLight = new THREE.Mesh(lightGeometry, greenLightMaterial);
-        frontLeftLight.position.set(-0.4 * type.scale, 0, 0.4 * type.scale);
-        body.add(frontLeftLight);
-        
-        // Back-right light (green)
-        const backRightLight = new THREE.Mesh(lightGeometry, greenLightMaterial);
-        backRightLight.position.set(0.4 * type.scale, 0, -0.4 * type.scale);
-        body.add(backRightLight);
+        // Skip some details on mobile
+        if (!this.isMobile) {
+            // Add camera/sensor on bottom
+            const cameraGeometry = new THREE.CylinderGeometry(0.15 * type.scale, 0.15 * type.scale, 0.2 * type.scale, 8);
+            const cameraMaterial = new THREE.MeshLambertMaterial({ color: 0x111111 });
+            const camera = new THREE.Mesh(cameraGeometry, cameraMaterial);
+            camera.rotation.x = Math.PI / 2;
+            camera.position.y = -0.3 * type.scale;
+            body.add(camera);
+            
+            // Add lights to the drone
+            const lightGeometry = new THREE.SphereGeometry(0.06 * type.scale, 8, 8);
+            const redLightMaterial = new THREE.MeshBasicMaterial({ color: 0xFF0000, emissive: 0xFF0000 });
+            const greenLightMaterial = new THREE.MeshBasicMaterial({ color: 0x00FF00, emissive: 0x00FF00 });
+            
+            // Add indicator lights
+            const frontRightLight = new THREE.Mesh(lightGeometry, redLightMaterial);
+            frontRightLight.position.set(0.4 * type.scale, 0, 0.4 * type.scale);
+            body.add(frontRightLight);
+            
+            const backLeftLight = new THREE.Mesh(lightGeometry, redLightMaterial);
+            backLeftLight.position.set(-0.4 * type.scale, 0, -0.4 * type.scale);
+            body.add(backLeftLight);
+            
+            const frontLeftLight = new THREE.Mesh(lightGeometry, greenLightMaterial);
+            frontLeftLight.position.set(-0.4 * type.scale, 0, 0.4 * type.scale);
+            body.add(frontLeftLight);
+            
+            const backRightLight = new THREE.Mesh(lightGeometry, greenLightMaterial);
+            backRightLight.position.set(0.4 * type.scale, 0, -0.4 * type.scale);
+            body.add(backRightLight);
+        } else {
+            // Simpler indicator for mobile
+            const lightGeometry = new THREE.SphereGeometry(0.08 * type.scale, 4, 4);
+            const lightMaterial = new THREE.MeshBasicMaterial({ color: 0xFF0000, emissive: 0xFF0000 });
+            const light = new THREE.Mesh(lightGeometry, lightMaterial);
+            light.position.set(0, -0.2 * type.scale, 0);
+            body.add(light);
+        }
         
         // Store drone type info
         body.userData = {
