@@ -223,6 +223,17 @@ class Game {
             console.log('Creating Three.js scene...');
             this.scene = new THREE.Scene();
             
+            // ULTRA COMPATIBILITY MODE - check URL parameter
+            const urlParams = new URLSearchParams(window.location.search);
+            const forceSimpleMode = urlParams.has('simple');
+            const forceCompatMode = urlParams.has('compat') || forceSimpleMode;
+            
+            if (forceCompatMode) {
+                console.log('⚠️ COMPATIBILITY MODE FORCED BY URL PARAMETER');
+                this.isMobile = true;
+                this.forceSimpleMode = forceSimpleMode;
+            }
+            
             // Create camera
             console.log('Creating camera...');
             this.camera = new THREE.PerspectiveCamera(
@@ -232,17 +243,46 @@ class Game {
                 CONFIG.RENDERING.FAR_PLANE
             );
             
-            // Create renderer with appropriate settings for the device
-            console.log('Creating renderer...');
-            this.renderer = new THREE.WebGLRenderer({
-                antialias: !this.isMobile && CONFIG.RENDERING.ANTIALIAS,
-                powerPreference: 'high-performance',
-                alpha: false,
-                precision: this.isMobile ? 'mediump' : 'highp' // Lower precision on mobile
-            });
+            // ULTRA COMPATIBILITY MODE - Use even more aggressive settings for problematic devices
+            if (forceCompatMode) {
+                console.log('Applying ultra-compatibility renderer settings...');
+                
+                // Force software renderer for maximum compatibility
+                this.renderer = new THREE.WebGLRenderer({
+                    antialias: false,
+                    powerPreference: 'low-power',
+                    precision: 'lowp',
+                    alpha: false,
+                    stencil: false,
+                    depth: true,
+                    logarithmicDepthBuffer: false
+                });
+                
+                // Ultra-low pixel ratio
+                this.renderer.setPixelRatio(1);
+                
+                // Disable all shadows and effects
+                CONFIG.RENDERING.SHADOWS = false;
+                CONFIG.RENDERING.FOG_ENABLED = false;
+                CONFIG.DRONE.MAX_COUNT = 3; // Absolute minimum drones
+                CONFIG.CITY.BUILDINGS = 5;  // Bare minimum buildings
+                
+                console.log('Ultra-compatibility mode enabled. All effects minimized.');
+            } else {
+                // Regular initialization with device-appropriate settings
+                console.log('Creating renderer...');
+                this.renderer = new THREE.WebGLRenderer({
+                    antialias: !this.isMobile && CONFIG.RENDERING.ANTIALIAS,
+                    powerPreference: 'high-performance',
+                    alpha: false,
+                    precision: this.isMobile ? 'mediump' : 'highp' // Lower precision on mobile
+                });
+                
+                this.renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2)); // Cap pixel ratio at 2
+            }
             
+            // Common setup for all modes
             this.renderer.setSize(window.innerWidth, window.innerHeight);
-            this.renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2)); // Cap pixel ratio at 2
             this.renderer.shadowMap.enabled = CONFIG.RENDERING.SHADOWS;
             this.renderer.shadowMap.type = THREE.PCFSoftShadowMap;
             
@@ -255,6 +295,11 @@ class Game {
             
             // Set initial camera position
             this.camera.position.set(0, CONFIG.PLAYER.HEIGHT, 0);
+            
+            // Set simple background color instead of skybox for compatibility mode
+            if (forceCompatMode) {
+                this.scene.background = new THREE.Color(0x87CEEB);
+            }
             
             console.log('Three.js initialization complete');
         } catch (error) {
