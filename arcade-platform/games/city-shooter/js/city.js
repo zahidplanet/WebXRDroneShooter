@@ -15,30 +15,41 @@ class CityGenerator {
         
         // ULTRA-SIMPLIFIED mode for mobile to ensure it loads
         this.ultraSimplified = this.isMobile;
+        
+        console.log(`City Generator initialized. Mobile: ${this.isMobile}, Ultra-simplified: ${this.ultraSimplified}`);
     }
     
     /**
      * Generate the entire city
      */
     generateCity() {
-        // Create ground and skybox first
-        this.createGround();
-        this.createSkybox();
-        
-        if (this.ultraSimplified) {
-            // Use super simplified city for mobile
-            this.createSimplifiedCity();
-        } else {
-            // Normal city for desktop
-            this.createBuildings();
-            this.createStreetLights();
+        try {
+            console.log("Starting city generation...");
+            
+            // Create ground and skybox first
+            this.createGround();
+            this.createSkybox();
+            
+            if (this.ultraSimplified) {
+                // Use super simplified city for mobile
+                console.log("Using simplified city for mobile");
+                this.createSimplifiedCity();
+            } else {
+                // Normal city for desktop
+                console.log("Creating normal city for desktop");
+                this.createBuildings();
+                this.createStreetLights();
+            }
+            
+            this.createSpawnPoints();
+            this.addFog();
+            this.addLighting();
+            
+            console.log(`City created with ${this.buildings.length} buildings`);
+        } catch (error) {
+            console.error("Error generating city:", error);
+            throw error;
         }
-        
-        this.createSpawnPoints();
-        this.addFog();
-        this.addLighting();
-        
-        console.log(`City created with ${this.buildings.length} buildings`);
     }
     
     /**
@@ -113,6 +124,24 @@ class CityGenerator {
     }
     
     /**
+     * Create building materials for desktop
+     */
+    createBuildingMaterials() {
+        // Create a range of building materials
+        const colors = CONFIG.CITY.BUILDING_COLORS || [0x555555, 0x666666, 0x777777, 0x888888, 0x999999];
+        
+        for (const color of colors) {
+            const material = new THREE.MeshStandardMaterial({
+                color: color,
+                roughness: 0.7 + Math.random() * 0.3,
+                metalness: Math.random() * 0.2
+            });
+            
+            this.buildingMaterials.push(material);
+        }
+    }
+    
+    /**
      * Create simplified street lights for mobile
      */
     createSimplifiedStreetLights(gridSize) {
@@ -167,14 +196,15 @@ class CityGenerator {
      * Create the ground plane
      */
     createGround() {
+        console.log("Creating ground plane...");
         const citySize = CONFIG.CITY.SIZE;
         
         // Create ground with simplified material on mobile
         const groundGeometry = new THREE.PlaneGeometry(citySize, citySize);
         const groundMaterial = this.isMobile ? 
-            new THREE.MeshBasicMaterial({ color: CONFIG.CITY.GROUND_COLOR }) : 
+            new THREE.MeshBasicMaterial({ color: CONFIG.CITY.GROUND_COLOR || 0x555555 }) : 
             new THREE.MeshStandardMaterial({
-                color: CONFIG.CITY.GROUND_COLOR,
+                color: CONFIG.CITY.GROUND_COLOR || 0x555555,
                 roughness: 0.8,
                 metalness: 0.2
             });
@@ -190,9 +220,138 @@ class CityGenerator {
         
         // Create a grid of streets (simplified on mobile)
         if (this.isMobile) {
+            console.log("Creating simplified streets for mobile");
             this.createSimplifiedStreets();
         } else {
+            console.log("Creating normal streets for desktop");
             this.createStreets();
+        }
+    }
+    
+    /**
+     * Create streets for desktop
+     */
+    createStreets() {
+        const citySize = CONFIG.CITY.SIZE;
+        const blockSize = CONFIG.CITY.BLOCK_SIZE || 20;
+        const streetWidth = CONFIG.CITY.STREET_WIDTH || 10;
+        
+        // Street material
+        const streetMaterial = new THREE.MeshStandardMaterial({
+            color: CONFIG.CITY.STREET_COLOR || 0x333333,
+            roughness: 0.9,
+            metalness: 0.1
+        });
+        
+        // Create grid of streets
+        for (let x = -citySize/2 + blockSize + streetWidth/2; x < citySize/2; x += blockSize + streetWidth) {
+            // North-South streets
+            const nsStreetGeometry = new THREE.PlaneGeometry(streetWidth, citySize);
+            const nsStreet = new THREE.Mesh(nsStreetGeometry, streetMaterial);
+            nsStreet.rotation.x = -Math.PI / 2; // Horizontal
+            nsStreet.position.set(x, 0.05, 0); // Slightly above ground to prevent z-fighting
+            nsStreet.receiveShadow = true;
+            this.scene.add(nsStreet);
+        }
+        
+        for (let z = -citySize/2 + blockSize + streetWidth/2; z < citySize/2; z += blockSize + streetWidth) {
+            // East-West streets
+            const ewStreetGeometry = new THREE.PlaneGeometry(citySize, streetWidth);
+            const ewStreet = new THREE.Mesh(ewStreetGeometry, streetMaterial);
+            ewStreet.rotation.x = -Math.PI / 2; // Horizontal
+            ewStreet.position.set(0, 0.05, z); // Slightly above ground to prevent z-fighting
+            ewStreet.receiveShadow = true;
+            this.scene.add(ewStreet);
+        }
+        
+        // Add street markings
+        this.addStreetMarkings(citySize, blockSize, streetWidth);
+    }
+    
+    /**
+     * Add markings to streets
+     */
+    addStreetMarkings(citySize, blockSize, streetWidth) {
+        // White line material
+        const lineMaterial = new THREE.MeshBasicMaterial({ color: 0xFFFFFF });
+        
+        // Create centerlines on streets
+        for (let x = -citySize/2 + blockSize + streetWidth/2; x < citySize/2; x += blockSize + streetWidth) {
+            // North-South street centerlines
+            const nsLineGeometry = new THREE.PlaneGeometry(0.2, citySize);
+            const nsLine = new THREE.Mesh(nsLineGeometry, lineMaterial);
+            nsLine.rotation.x = -Math.PI / 2; // Horizontal
+            nsLine.position.set(x, 0.06, 0); // Slightly above street
+            this.scene.add(nsLine);
+        }
+        
+        for (let z = -citySize/2 + blockSize + streetWidth/2; z < citySize/2; z += blockSize + streetWidth) {
+            // East-West street centerlines
+            const ewLineGeometry = new THREE.PlaneGeometry(citySize, 0.2);
+            const ewLine = new THREE.Mesh(ewLineGeometry, lineMaterial);
+            ewLine.rotation.x = -Math.PI / 2; // Horizontal
+            ewLine.position.set(0, 0.06, z); // Slightly above street
+            this.scene.add(ewLine);
+        }
+        
+        // Add crosswalks at intersections
+        for (let x = -citySize/2 + blockSize + streetWidth/2; x < citySize/2; x += blockSize + streetWidth) {
+            for (let z = -citySize/2 + blockSize + streetWidth/2; z < citySize/2; z += blockSize + streetWidth) {
+                this.createCrosswalk(x, z, streetWidth, lineMaterial);
+            }
+        }
+    }
+    
+    /**
+     * Create a crosswalk at an intersection
+     */
+    createCrosswalk(x, z, streetWidth, material) {
+        const stripeWidth = 0.4;
+        const stripeSpacing = 0.4;
+        const crosswalkWidth = streetWidth * 0.6;
+        
+        // North crosswalk
+        for (let i = -crosswalkWidth/2; i < crosswalkWidth/2; i += stripeWidth + stripeSpacing) {
+            const stripe = new THREE.Mesh(
+                new THREE.PlaneGeometry(stripeWidth, 2),
+                material
+            );
+            stripe.rotation.x = -Math.PI / 2; // Horizontal
+            stripe.position.set(x + i, 0.06, z - streetWidth/2 - 1);
+            this.scene.add(stripe);
+        }
+        
+        // East crosswalk
+        for (let i = -crosswalkWidth/2; i < crosswalkWidth/2; i += stripeWidth + stripeSpacing) {
+            const stripe = new THREE.Mesh(
+                new THREE.PlaneGeometry(2, stripeWidth),
+                material
+            );
+            stripe.rotation.x = -Math.PI / 2; // Horizontal
+            stripe.position.set(x + streetWidth/2 + 1, 0.06, z + i);
+            this.scene.add(stripe);
+        }
+        
+        // South crosswalk
+        for (let i = -crosswalkWidth/2; i < crosswalkWidth/2; i += stripeWidth + stripeSpacing) {
+            const stripe = new THREE.Mesh(
+                new THREE.PlaneGeometry(stripeWidth, 2),
+                material
+            );
+            stripe.rotation.x = -Math.PI / 2; // Horizontal
+            stripe.position.set(x + i, 0.06, z + streetWidth/2 + 1);
+            this.scene.add(stripe);
+        }
+        
+        // West crosswalk
+        for (let i = -crosswalkWidth/2; i < crosswalkWidth/2; i += stripeWidth + stripeSpacing) {
+            const stripe = new THREE.Mesh(
+                new THREE.PlaneGeometry(2, stripeWidth),
+                material
+            );
+            stripe.rotation.x = -Math.PI / 2; // Horizontal
+            stripe.position.set(x - streetWidth/2 - 1, 0.06, z + i);
+            this.scene.add(stripe);
         }
     }
     
@@ -248,7 +407,7 @@ class CityGenerator {
         // Create a large sphere to serve as the sky
         const skyGeometry = new THREE.SphereGeometry(CONFIG.CITY.SIZE, segments, segments);
         const skyMaterial = new THREE.MeshBasicMaterial({
-            color: CONFIG.CITY.SKY_COLOR,
+            color: CONFIG.CITY.SKY_COLOR || 0x87CEEB,
             side: THREE.BackSide // Render on the inside of the sphere
         });
         
@@ -261,8 +420,8 @@ class CityGenerator {
      */
     addFog() {
         // Skip fog on mobile for better performance
-        if (!this.isMobile) {
-            this.scene.fog = new THREE.FogExp2(0xCCCCCC, CONFIG.CITY.FOG_DENSITY);
+        if (!this.isMobile && CONFIG.RENDERING.FOG_ENABLED) {
+            this.scene.fog = new THREE.FogExp2(CONFIG.RENDERING.FOG_COLOR || 0xCCCCCC, 0.002);
         }
     }
     
@@ -271,26 +430,31 @@ class CityGenerator {
      */
     addLighting() {
         // Add ambient light
-        const ambientLight = new THREE.AmbientLight(0xFFFFFF, CONFIG.CITY.AMBIENT_LIGHT_INTENSITY);
+        const ambientIntensity = CONFIG.CITY?.AMBIENT_LIGHT_INTENSITY || 0.6;
+        const ambientLight = new THREE.AmbientLight(0xFFFFFF, ambientIntensity);
         this.scene.add(ambientLight);
         
         // On mobile, skip directional light and shadows
         if (!this.isMobile) {
             // Add directional light (sun)
-            const sunlight = new THREE.DirectionalLight(0xFFFFFF, CONFIG.CITY.SUN_LIGHT_INTENSITY);
+            const sunIntensity = CONFIG.CITY?.SUN_LIGHT_INTENSITY || 0.8;
+            const sunlight = new THREE.DirectionalLight(0xFFFFFF, sunIntensity);
             sunlight.position.set(200, 400, 300);
-            sunlight.castShadow = true;
+            sunlight.castShadow = CONFIG.RENDERING.SHADOWS;
             
             // Configure shadow properties
-            sunlight.shadow.mapSize.width = CONFIG.RENDER.SHADOW_MAP_SIZE;
-            sunlight.shadow.mapSize.height = CONFIG.RENDER.SHADOW_MAP_SIZE;
-            const shadowSize = CONFIG.CITY.SIZE / 2;
-            sunlight.shadow.camera.left = -shadowSize;
-            sunlight.shadow.camera.right = shadowSize;
-            sunlight.shadow.camera.top = shadowSize;
-            sunlight.shadow.camera.bottom = -shadowSize;
-            sunlight.shadow.camera.near = 1;
-            sunlight.shadow.camera.far = 1000;
+            if (CONFIG.RENDERING.SHADOWS) {
+                const shadowMapSize = CONFIG.RENDERING.SHADOW_MAP_SIZE || 1024;
+                sunlight.shadow.mapSize.width = shadowMapSize;
+                sunlight.shadow.mapSize.height = shadowMapSize;
+                const shadowSize = CONFIG.CITY.SIZE / 2;
+                sunlight.shadow.camera.left = -shadowSize;
+                sunlight.shadow.camera.right = shadowSize;
+                sunlight.shadow.camera.top = shadowSize;
+                sunlight.shadow.camera.bottom = -shadowSize;
+                sunlight.shadow.camera.near = 1;
+                sunlight.shadow.camera.far = 1000;
+            }
             
             this.scene.add(sunlight);
         }
@@ -476,15 +640,82 @@ class CityGenerator {
     /**
      * Add windows to a building
      */
-    addWindowsToBuilding(building, width, height, depth, windowMaterial) {
-        // ... [existing window creation code remains the same] 
-        
+    addWindowsToBuilding(building, width, height, depth) {
         // On mobile, reduce the number of windows per building
         const windowSize = 1.2;
         const windowSpacing = this.isMobile ? 4 : 3; // Increased spacing on mobile = fewer windows
         const windowDepth = 0.1;
         
-        // ... [rest of the code remains the same]
+        // Create window material
+        const windowMaterial = new THREE.MeshBasicMaterial({ 
+            color: 0x88CCFF,
+            transparent: true,
+            opacity: 0.7
+        });
+        
+        // Calculate number of windows per floor and number of floors
+        const windowsPerSide = Math.floor(width / windowSpacing);
+        const windowsPerFront = Math.floor(depth / windowSpacing);
+        const numFloors = Math.floor(height / windowSpacing);
+        
+        // Create window meshes for all sides of building
+        for (let floor = 0; floor < numFloors; floor++) {
+            // Skip some floors randomly
+            if (Math.random() < 0.2) continue;
+            
+            const floorHeight = -height/2 + windowSpacing/2 + floor * windowSpacing;
+            
+            // Windows on side faces (left and right)
+            for (let i = 0; i < windowsPerSide; i++) {
+                // Skip some windows randomly
+                if (Math.random() < 0.3) continue;
+                
+                const xOffset = -width/2 + windowSpacing/2 + i * windowSpacing;
+                
+                // Left side
+                const leftWindow = new THREE.Mesh(
+                    new THREE.PlaneGeometry(windowSize, windowSize),
+                    windowMaterial
+                );
+                leftWindow.position.set(xOffset, floorHeight, -depth/2 - 0.01);
+                building.add(leftWindow);
+                
+                // Right side
+                const rightWindow = new THREE.Mesh(
+                    new THREE.PlaneGeometry(windowSize, windowSize),
+                    windowMaterial
+                );
+                rightWindow.position.set(xOffset, floorHeight, depth/2 + 0.01);
+                rightWindow.rotation.y = Math.PI;
+                building.add(rightWindow);
+            }
+            
+            // Windows on front and back faces
+            for (let i = 0; i < windowsPerFront; i++) {
+                // Skip some windows randomly
+                if (Math.random() < 0.3) continue;
+                
+                const zOffset = -depth/2 + windowSpacing/2 + i * windowSpacing;
+                
+                // Front face
+                const frontWindow = new THREE.Mesh(
+                    new THREE.PlaneGeometry(windowSize, windowSize),
+                    windowMaterial
+                );
+                frontWindow.position.set(-width/2 - 0.01, floorHeight, zOffset);
+                frontWindow.rotation.y = -Math.PI / 2;
+                building.add(frontWindow);
+                
+                // Back face
+                const backWindow = new THREE.Mesh(
+                    new THREE.PlaneGeometry(windowSize, windowSize),
+                    windowMaterial
+                );
+                backWindow.position.set(width/2 + 0.01, floorHeight, zOffset);
+                backWindow.rotation.y = Math.PI / 2;
+                building.add(backWindow);
+            }
+        }
     }
     
     /**
