@@ -1,1 +1,20 @@
 node_modules/
+
+# Unity specific
+Library/
+Logs/
+Packages/packages-lock.json
+UserSettings/
+Temp/
+*.csproj
+*.unityproj
+*.sln
+*.suo
+*.tmp
+*.user
+*.userprefs
+*.pidb
+*.booproj
+*.svd
+*.pdb
+*.opendb
