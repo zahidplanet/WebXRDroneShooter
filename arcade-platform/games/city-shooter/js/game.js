@@ -5,46 +5,61 @@
 
 class Game {
     constructor() {
-        // Core three.js components
-        this.scene = null;
-        this.camera = null;
-        this.renderer = null;
+        // Add debug to console immediately
+        console.log('Game constructor called. Starting initialization...');
+        console.log('User agent:', navigator.userAgent);
+        console.log('Window dimensions:', window.innerWidth, 'x', window.innerHeight);
         
-        // Game managers
-        this.networkManager = null;
-        this.playerManager = null;
-        this.droneManager = null;
-        this.cityGenerator = null;
-        
-        // Game state
-        this.isRunning = false;
-        this.isPaused = false;
-        this.lastTime = 0;
-        this.animations = []; // Custom animation callbacks
-        
-        // Performance monitoring
-        this.stats = null;
-        this.fps = 0;
-        this.frameCount = 0;
-        this.lastFpsUpdate = 0;
-        
-        // Mobile detection and performance options
-        this.isMobile = 'ontouchstart' in window || navigator.maxTouchPoints > 0;
-        this.forceSimpleMode = window.location.search.includes('simple=true'); // URL param to force simple mode
-        
-        if (this.forceSimpleMode) {
-            console.log("Simple mode forced by URL parameter");
-            // Force mobile optimizations even on desktop
-            this.isMobile = true;
+        try {
+            // Core three.js components
+            this.scene = null;
+            this.camera = null;
+            this.renderer = null;
+            
+            // Game managers
+            this.networkManager = null;
+            this.playerManager = null;
+            this.droneManager = null;
+            this.cityGenerator = null;
+            
+            // Game state
+            this.isRunning = false;
+            this.isPaused = false;
+            this.lastTime = 0;
+            this.animations = []; // Custom animation callbacks
+            
+            // Performance monitoring
+            this.stats = null;
+            this.fps = 0;
+            this.frameCount = 0;
+            this.lastFpsUpdate = 0;
+            
+            // Mobile detection and performance options
+            this.isMobile = 'ontouchstart' in window || navigator.maxTouchPoints > 0;
+            this.forceSimpleMode = window.location.search.includes('simple=true'); // URL param to force simple mode
+            
+            if (this.forceSimpleMode) {
+                console.log("Simple mode forced by URL parameter");
+                // Force mobile optimizations even on desktop
+                this.isMobile = true;
+            }
+            
+            console.log('Mobile detection result:', this.isMobile);
+            console.log('Simple mode:', this.forceSimpleMode);
+            
+            // Loading state
+            this.totalLoadingSteps = 5; // Number of major loading steps
+            this.loadingProgress = 0;
+            
+            // Bind methods
+            this.update = this.update.bind(this);
+            this.onWindowResize = this.onWindowResize.bind(this);
+            
+            console.log('Game constructor completed successfully');
+        } catch (error) {
+            console.error('Error in game constructor:', error);
+            this.showErrorOnPage('Failed to initialize game: ' + error.message);
         }
-        
-        // Loading state
-        this.totalLoadingSteps = 5; // Number of major loading steps
-        this.loadingProgress = 0;
-        
-        // Bind methods
-        this.update = this.update.bind(this);
-        this.onWindowResize = this.onWindowResize.bind(this);
     }
     
     /**
@@ -57,38 +72,85 @@ class Game {
         try {
             // Initialize core components
             this.updateLoadingProgress('Initializing graphics engine...', 0);
-            this.initThreeJS();
-            this.addEventListeners();
+            
+            try {
+                console.log('Initializing Three.js...');
+                this.initThreeJS();
+                console.log('Three.js initialized successfully');
+            } catch (error) {
+                console.error('Failed to initialize ThreeJS:', error);
+                throw new Error('Graphics initialization failed: ' + error.message);
+            }
+            
+            try {
+                console.log('Adding event listeners...');
+                this.addEventListeners();
+                console.log('Event listeners added');
+            } catch (error) {
+                console.error('Failed to add event listeners:', error);
+                // Non-fatal error, continue
+            }
             
             // Initialize stats if debug mode is enabled
             if (CONFIG.GAME.DEBUG) {
+                console.log('Initializing debug stats...');
                 this.initStats();
             }
             
             // Apply mobile optimizations if needed
             if (this.isMobile) {
+                console.log('Applying mobile optimizations...');
                 this.applyMobileOptimizations();
             }
             
             // Initialize networking
             this.updateLoadingProgress('Connecting to network...', 1);
-            this.networkManager = new NetworkManager(this);
-            await this.networkManager.init();
+            try {
+                console.log('Initializing network manager...');
+                this.networkManager = new NetworkManager(this);
+                await this.networkManager.init();
+                console.log('Network manager initialized');
+            } catch (error) {
+                console.error('Failed to initialize network manager:', error);
+                // Non-fatal error, continue with offline mode
+            }
             
             // Generate city environment
             this.updateLoadingProgress('Generating city environment...', 2);
-            this.cityGenerator = new CityGenerator(this);
-            this.cityGenerator.generateCity();
+            try {
+                console.log('Creating city generator...');
+                this.cityGenerator = new CityGenerator(this);
+                console.log('Generating city...');
+                this.cityGenerator.generateCity();
+                console.log('City generation complete');
+            } catch (error) {
+                console.error('Failed to generate city:', error);
+                throw new Error('City generation failed: ' + error.message);
+            }
             
             // Initialize drone manager
             this.updateLoadingProgress('Preparing enemy drones...', 3);
-            this.droneManager = new DroneManager(this);
-            this.droneManager.init();
+            try {
+                console.log('Initializing drone manager...');
+                this.droneManager = new DroneManager(this);
+                this.droneManager.init();
+                console.log('Drone manager initialized');
+            } catch (error) {
+                console.error('Failed to initialize drone manager:', error);
+                throw new Error('Drone initialization failed: ' + error.message);
+            }
             
             // Initialize player manager
             this.updateLoadingProgress('Setting up player controls...', 4);
-            this.playerManager = new PlayerManager(this);
-            this.playerManager.init();
+            try {
+                console.log('Initializing player manager...');
+                this.playerManager = new PlayerManager(this);
+                this.playerManager.init();
+                console.log('Player manager initialized');
+            } catch (error) {
+                console.error('Failed to initialize player manager:', error);
+                throw new Error('Player initialization failed: ' + error.message);
+            }
             
             // Final setup
             this.updateLoadingProgress('Ready to play!', 5);
@@ -103,6 +165,7 @@ class Game {
         } catch (error) {
             console.error('Failed to initialize game:', error);
             this.showErrorScreen('Failed to initialize game: ' + error.message);
+            this.showErrorOnPage(error.message);
             return false;
         }
     }
@@ -155,35 +218,49 @@ class Game {
      * Initialize Three.js components
      */
     initThreeJS() {
-        // Create scene
-        this.scene = new THREE.Scene();
-        
-        // Create camera
-        this.camera = new THREE.PerspectiveCamera(
-            CONFIG.RENDERING.FOV,
-            window.innerWidth / window.innerHeight,
-            CONFIG.RENDERING.NEAR_PLANE,
-            CONFIG.RENDERING.FAR_PLANE
-        );
-        
-        // Create renderer with appropriate settings for the device
-        this.renderer = new THREE.WebGLRenderer({
-            antialias: !this.isMobile && CONFIG.RENDERING.ANTIALIAS,
-            powerPreference: 'high-performance',
-            alpha: false,
-            precision: this.isMobile ? 'mediump' : 'highp' // Lower precision on mobile
-        });
-        
-        this.renderer.setSize(window.innerWidth, window.innerHeight);
-        this.renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2)); // Cap pixel ratio at 2
-        this.renderer.shadowMap.enabled = CONFIG.RENDERING.SHADOWS;
-        this.renderer.shadowMap.type = THREE.PCFSoftShadowMap;
-        
-        // Add canvas to DOM
-        document.getElementById('game-container').appendChild(this.renderer.domElement);
-        
-        // Set initial camera position
-        this.camera.position.set(0, CONFIG.PLAYER.HEIGHT, 0);
+        try {
+            // Create scene
+            console.log('Creating Three.js scene...');
+            this.scene = new THREE.Scene();
+            
+            // Create camera
+            console.log('Creating camera...');
+            this.camera = new THREE.PerspectiveCamera(
+                CONFIG.RENDERING.FOV,
+                window.innerWidth / window.innerHeight,
+                CONFIG.RENDERING.NEAR_PLANE,
+                CONFIG.RENDERING.FAR_PLANE
+            );
+            
+            // Create renderer with appropriate settings for the device
+            console.log('Creating renderer...');
+            this.renderer = new THREE.WebGLRenderer({
+                antialias: !this.isMobile && CONFIG.RENDERING.ANTIALIAS,
+                powerPreference: 'high-performance',
+                alpha: false,
+                precision: this.isMobile ? 'mediump' : 'highp' // Lower precision on mobile
+            });
+            
+            this.renderer.setSize(window.innerWidth, window.innerHeight);
+            this.renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2)); // Cap pixel ratio at 2
+            this.renderer.shadowMap.enabled = CONFIG.RENDERING.SHADOWS;
+            this.renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+            
+            // Add canvas to DOM
+            const container = document.getElementById('game-container');
+            if (!container) {
+                throw new Error("Game container element not found");
+            }
+            container.appendChild(this.renderer.domElement);
+            
+            // Set initial camera position
+            this.camera.position.set(0, CONFIG.PLAYER.HEIGHT, 0);
+            
+            console.log('Three.js initialization complete');
+        } catch (error) {
+            console.error('Error in initThreeJS:', error);
+            throw error;
+        }
     }
     
     /**
@@ -210,6 +287,29 @@ class Game {
         fpsCounter.style.fontFamily = 'monospace';
         fpsCounter.textContent = 'FPS: 0';
         document.body.appendChild(fpsCounter);
+    }
+    
+    /**
+     * Display an error message directly on the page
+     */
+    showErrorOnPage(message) {
+        const loadingText = document.querySelector('.loading-text');
+        if (loadingText) {
+            loadingText.innerHTML = `<span style="color: red; font-weight: bold;">Error: ${message}</span><br><button onclick="window.location.reload()" style="margin-top: 10px; padding: 5px 10px;">Retry</button>`;
+        }
+        
+        const debugInfo = document.getElementById('debug-info');
+        if (debugInfo) {
+            debugInfo.style.display = 'block';
+            debugInfo.innerHTML = `
+                <strong>Error:</strong> ${message}<br>
+                <strong>Browser:</strong> ${navigator.userAgent}<br>
+                <strong>Mobile:</strong> ${this.isMobile}<br>
+                <strong>Simple Mode:</strong> ${this.forceSimpleMode}<br>
+                <strong>Screen:</strong> ${window.innerWidth}x${window.innerHeight}<br>
+                <button onclick="window.location.href = window.location.href + '?simple=true'">Try Simple Mode</button>
+            `;
+        }
     }
     
     /**
@@ -548,12 +648,19 @@ class Game {
         
         const loadingText = loadingScreen.querySelector('.loading-text');
         if (loadingText) {
-            loadingText.innerHTML = `Error: ${message}<br><button id="retry-button">Retry</button>`;
+            loadingText.innerHTML = `Error: ${message}<br><button id="retry-button" style="margin-top: 15px; padding: 8px 16px; background: #00a8ff; color: white; border: none; border-radius: 4px; cursor: pointer;">Retry</button><br><button id="simple-mode-button" style="margin-top: 10px; padding: 8px 16px; background: #333; color: white; border: none; border-radius: 4px; cursor: pointer;">Try Simple Mode</button>`;
             
             const retryButton = document.getElementById('retry-button');
             if (retryButton) {
                 retryButton.addEventListener('click', () => {
                     window.location.reload();
+                });
+            }
+            
+            const simpleModeButton = document.getElementById('simple-mode-button');
+            if (simpleModeButton) {
+                simpleModeButton.addEventListener('click', () => {
+                    window.location.href = window.location.pathname + (window.location.search ? window.location.search + '&simple=true' : '?simple=true');
                 });
             }
         }
@@ -576,9 +683,23 @@ class Game {
 
 // Initialize game when DOM is loaded
 window.addEventListener('DOMContentLoaded', () => {
-    const game = new Game();
-    game.init();
-    
-    // Store game instance globally for debugging
-    window.gameInstance = game;
+    console.log('DOM loaded, initializing game...');
+    try {
+        const game = new Game();
+        game.init().catch(error => {
+            console.error('Game initialization failed:', error);
+        });
+        
+        // Store game instance globally for debugging
+        window.gameInstance = game;
+    } catch (error) {
+        console.error('Error creating game instance:', error);
+        alert('Failed to initialize game: ' + error.message);
+        
+        // Show error on page
+        const loadingText = document.querySelector('.loading-text');
+        if (loadingText) {
+            loadingText.innerHTML = `<span style="color: red; font-weight: bold;">Fatal Error: ${error.message}</span><br><button onclick="window.location.reload()" style="margin-top: 10px; padding: 5px 10px;">Retry</button>`;
+        }
+    }
 }); 

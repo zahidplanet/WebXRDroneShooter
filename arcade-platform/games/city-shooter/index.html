@@ -8,8 +8,9 @@
     <title>City Drone Shooter - AR-Cade Platform</title>
     <link rel="icon" type="image/png" href="../../assets/favicon.png">
     
-    <!-- Preload critical resources -->
-    <link rel="preload" href="https://cdn.jsdelivr.net/npm/three@0.149.0/build/three.min.js" as="script">
+    <!-- Load Three.js and controls immediately (no defer) to prevent initialization errors -->
+    <script src="https://cdn.jsdelivr.net/npm/three@0.149.0/build/three.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/three@0.149.0/examples/js/controls/PointerLockControls.js"></script>
     
     <style>
         * {
@@ -300,9 +301,6 @@
             color: #aaa;
         }
     </style>
-    
-    <!-- Load Three.js early -->
-    <script src="https://cdn.jsdelivr.net/npm/three@0.149.0/build/three.min.js"></script>
 </head>
 <body>
     <!-- Game Container -->
@@ -372,8 +370,7 @@
     <!-- Debug Info -->
     <div id="debug-info"></div>
     
-    <!-- Scripts are loaded with defer to improve page load performance -->
-    <script src="https://cdn.jsdelivr.net/npm/three@0.149.0/examples/js/controls/PointerLockControls.js" defer></script>
+    <!-- Other libraries and game scripts with defer -->
     <script src="https://cdn.colyseus.io/client/0.14.13/colyseus.js" defer></script>
     
     <!-- Game Scripts -->
