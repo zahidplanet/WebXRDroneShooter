@@ -1,5 +1,8 @@
 {
   "dependencies": {
+    "express": "^4.21.2",
+    "ip": "^2.0.1",
+    "ngrok": "^5.0.0-beta.2",
     "qrcode-terminal": "^0.12.0"
   }
 }
