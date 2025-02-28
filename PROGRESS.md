@@ -13,7 +13,10 @@
 
 ### Fixed Issues
 - ✅ Fixed missing `createStreets()` method that was breaking desktop initialization
-- ✅ Added extensive error handling in city generation
+- ✅ Fixed Three.js PointerLockControls loading issue that prevented desktop version from initializing
+- ✅ Added extensive error handling and debugging for mobile troubleshooting
+- ✅ Improved script loading order to prevent race conditions 
+- ✅ Added detailed error reporting on the page with "Simple Mode" option
 - ✅ Implemented fallback values for all CONFIG properties to prevent undefined errors
 - ✅ Improved mobile detection and optimization
 - ✅ Fixed window creation on buildings
@@ -33,10 +36,16 @@
    - Or use URL: `https://YOUR_IP:8445/arcade-platform/games/city-shooter/index.html`
    - For slower devices add `?simple=true` to the URL
 
+4. If you encounter errors:
+   - Check the browser console for detailed error messages
+   - Try the "Simple Mode" option that appears on the error screen
+   - On mobile, add `?simple=true` to the URL to force ultra-simplified mode
+
 ### Known Issues
 - Ngrok integration needs authentication to work properly
 - Certificate warnings on first access (expected for development)
 - Mobile performance varies based on device capability
+- Some mobile browsers may have WebGL limitations
 
 ### Next Steps
 1. Implement basic multiplayer functionality
@@ -48,6 +57,7 @@
 ## Commit History
 
 ### Latest Updates
+- Fix PointerLockControls error and add detailed debugging for mobile loading
 - Update .gitignore to exclude Unity-specific files and directories
 - Add dependencies for cross-device testing (express, ip, ngrok)
 - Fix city.js: Add missing createStreets method and window creation to fix desktop and mobile loading
@@ -56,4 +66,5 @@
 ## Testing Notes
 - The desktop version should show a detailed city with many buildings, streets, and crosswalks
 - The mobile version automatically uses simplified graphics
-- Use `?simple=true` parameter for the absolute minimum graphics on slower devices 
+- Use `?simple=true` parameter for the absolute minimum graphics on slower devices
+- If you encounter errors, check the console for detailed messages and try Simple Mode 
